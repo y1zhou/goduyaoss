@@ -8,6 +8,15 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// Provider holds the information about a provider. It's possible for a provider
+// to have multiple subgroups with different names and speed test results (ImgURL).
+type Provider struct {
+	Name     string
+	TitleID  string
+	ImgURL   string
+	Subgroup []Provider
+}
+
 // Given a URL, return the response as a goquery document.
 func requestPage(url string) *goquery.Document {
 	res, err := http.Get(url)
@@ -29,15 +38,24 @@ func requestPage(url string) *goquery.Document {
 
 // Find the providers in the <h2> elements, and return the id
 // attr of those elements as a list.
-func fetchProviders(doc *goquery.Document) []string {
-	var providers []string
+func fetchProviders(doc *goquery.Document) []Provider {
+	var providers []Provider
 	regexProvider := regexp.MustCompile(`^\d*\.`)
 	doc.Find("h2").Each(func(i int, s *goquery.Selection) {
+		// Each provider's name starts with a serial number.
 		title := s.Text()
 		if regexProvider.MatchString(title) {
-			ProviderID, _ := s.Attr("id")
-			log.Printf("Provider found: %q -> %q\n", title, ProviderID)
-			providers = append(providers, ProviderID)
+			providerID, _ := s.Attr("id")
+			res := Provider{Name: title, TitleID: providerID}
+
+			// See if there's subgroups. Check for <h3> elements until the next provider
+			s.NextFilteredUntil("h3", "h2").Each(func(i int, ss *goquery.Selection) {
+				subTitle := ss.Text()
+				subID, _ := ss.Attr("id")
+				res.Subgroup = append(res.Subgroup, Provider{Name: subTitle, TitleID: subID})
+			})
+
+			providers = append(providers, res)
 		}
 	})
 	return providers

@@ -17,7 +17,17 @@ func TestFetchProviders(t *testing.T) {
 	doc := requestPage(ts.URL + "/html")
 	providers := fetchProviders(doc)
 	if len(providers) != 51 {
-		t.Fatalf("Should be 51 providers, found %d", len(providers))
+		t.Fatalf("Found %d out of 51 providers.", len(providers))
+	}
+
+	subgroupCount := 0
+	for _, provider := range providers {
+		if provider.Subgroup != nil {
+			subgroupCount++
+		}
+	}
+	if subgroupCount != 7 {
+		t.Fatalf("Found %d out of 7 subgroups.", subgroupCount)
 	}
 }
 
