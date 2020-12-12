@@ -1,30 +1,61 @@
 package crawler
 
 import (
-	"fmt"
+	"log"
+	"net/http"
+	"regexp"
 
-	"github.com/gocolly/colly"
+	"github.com/PuerkitoBio/goquery"
 )
 
-func main() {
-	// Instantiate default collector
-	c := colly.NewCollector()
+// Given a URL, return the response as a goquery document.
+func requestPage(url string) *goquery.Document {
+	res, err := http.Get(url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+	}
 
-	// Before making a request print "Visiting ..."
-	c.OnRequest(func(r *colly.Request) {
-		fmt.Println("Visiting", r.URL.String())
-	})
-
-	// On every a element which has href attribute call callback
-	c.OnHTML("h2", func(e *colly.HTMLElement) {
-		link := e.Attr("id")
-		// Print link
-		fmt.Printf("Provider found: %q -> %s\n", e.Text, link)
-
-	})
-
-	// Start scraping on https://hackerspaces.org
-	c.Visit("https://www.duyaoss.com/archives/1031/")
-	// c.Visit("https://www.duyaoss.com/archives/3/")
-	// c.Visit("https://www.duyaoss.com/archives/1/")
+	// Load the HTML document
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return doc
 }
+
+// Find the providers in the <h2> elements, and return the id
+// attr of those elements as a list.
+func fetchProviders(doc *goquery.Document) []string {
+	var providers []string
+	regexProvider := regexp.MustCompile(`^\d*\.`)
+	doc.Find("h2").Each(func(i int, s *goquery.Selection) {
+		title := s.Text()
+		if regexProvider.MatchString(title) {
+			ProviderID, _ := s.Attr("id")
+			log.Printf("Provider found: %q -> %q\n", title, ProviderID)
+			providers = append(providers, ProviderID)
+		}
+	})
+	return providers
+}
+
+func main() {
+	doc := requestPage("https://www.duyaoss.com/archives/1031/")
+	providers := fetchProviders(doc)
+	for _, provider := range providers {
+		log.Printf("Provider ID: %q\n", provider)
+	}
+	// FetchProviders("https://www.duyaoss.com/archives/3/")
+	// FetchProviders("https://www.duyaoss.com/archives/1/")
+}
+
+// func extractFigs(e *goquery.Selection) {
+// 	e.Find("figure").Siblings().NextUntil("h2").Each(func(i int, s *goquery.Selection) {
+// 		link, _ := s.Attr("data-src")
+// 		fmt.Printf("  %d, Image link: %s\n", i, link)
+// 	}
+// }
