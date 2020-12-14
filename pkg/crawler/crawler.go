@@ -1,6 +1,8 @@
 package crawler
 
 import (
+	"image"
+	"image/png"
 	"log"
 	"net/http"
 	"regexp"
@@ -41,8 +43,8 @@ func requestPage(url string) *goquery.Document {
 	return doc
 }
 
-// Find the providers in the <h2> elements, and return the id
-// attr of those elements as a list.
+// Find the providers in the <h2> elements, and parse the result into
+// an array of `Provider` structs.
 func fetchProviders(doc *goquery.Document) []Provider {
 	var providers []Provider
 	regexProvider := regexp.MustCompile(`^\d*\.`)
@@ -79,6 +81,23 @@ func fetchProviders(doc *goquery.Document) []Provider {
 		}
 	})
 	return providers
+}
+
+func fetchImage(url string) image.Image {
+	res, err := http.Get(url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+	}
+
+	img, err := png.Decode(res.Body)
+	if err != nil {
+		log.Fatalf("Error loading png image: %s", err)
+	}
+	return img
 }
 
 func main() {
