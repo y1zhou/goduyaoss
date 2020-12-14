@@ -2,7 +2,6 @@ package crawler
 
 import (
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,10 +32,10 @@ func TestFetchProviders(t *testing.T) {
 
 func newTestServer() *httptest.Server {
 	htmlPage, _ := ioutil.ReadFile("testdata/duyaoss3.html")
-	img, err := ioutil.ReadFile("testdata/sample_img.png")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// img, err := ioutil.ReadFile("testdata/sample_img.png")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	mux := http.NewServeMux()
 
@@ -50,10 +49,10 @@ func newTestServer() *httptest.Server {
 		w.Write(htmlPage)
 	})
 
-	mux.HandleFunc("/img", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
-		w.Write(img)
-	})
+	// mux.HandleFunc("/img", func(w http.ResponseWriter, r *http.Request) {
+	// 	w.Header().Set("Content-Type", "image/png")
+	// 	w.Write(img)
+	// })
 
 	return httptest.NewServer(mux)
 }
