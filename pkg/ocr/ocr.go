@@ -55,18 +55,28 @@ func convertToBin(img gocv.Mat) {
 	gocv.AdaptiveThreshold(img, &img, 255, gocv.AdaptiveThresholdMean, gocv.ThresholdBinary, 11, 2)
 }
 
-func readToBw(filepath string) gocv.Mat {
-	img := gocv.IMRead(filepath, gocv.IMReadGrayScale)
-	bwImg := gocv.NewMat() // don't forget to close it later
+// detectLinesMorph uses different approaches to find horizontal and vertical lines:
+// - Horizontal lines are assumed to be at every other 30px.
+// - Vertical lines are detected through morphological operations
+func detectLinesMorph(imgBin gocv.Mat) (gocv.Mat, gocv.Mat) {
+	rows, cols := imgBin.Rows(), imgBin.Cols()
 
-	gocv.AdaptiveThreshold(img, &bwImg, 255, gocv.AdaptiveThresholdMean, gocv.ThresholdBinary, 11, 2)
+	// Horizontal lines
+	hLines := gocv.NewMatWithSize(rows, cols, gocv.MatTypeCV8U)
+	for i := 0; i < rows; i += 30 {
+		gocv.Line(&hLines, image.Point{0, i}, image.Point{cols, i}, white, 1)
+	}
+	// just to make sure the line at the bottom is added
+	gocv.Line(&hLines, image.Point{0, rows - 1}, image.Point{cols, rows - 1}, white, 1)
 
-	return bwImg
+	// Vertical lines
+	vLines := gocv.NewMatWithSize(rows, cols, gocv.MatTypeCV8U)
+	vertKernel := gocv.GetStructuringElement(gocv.MorphRect, image.Point{1, rows / rowHeight})
+	gocv.Erode(imgBin, &vLines, vertKernel)
+	gocv.Dilate(imgBin, &vLines, vertKernel)
+
+	return hLines, vLines
 }
-
-func enhanceBoarders() {}
-
-func detectLinesMorph() {}
 
 func getIntersections() {}
 

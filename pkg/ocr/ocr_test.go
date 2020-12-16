@@ -34,8 +34,13 @@ func TestConvertToBin(t *testing.T) {
 	gocv.IMWrite("cache/sample_img_binary.png", img)
 }
 
-func TestReadToBw(t *testing.T) {
-	bwImg := readToBw("cache/sample_img_gray.png")
-	defer bwImg.Close()
-	gocv.IMWrite("cache/sample_img_bw.png", bwImg)
+func TestDetectLinesMorph(t *testing.T) {
+	img := readImg("testdata/sample_img.png")
+	defer img.Close()
+
+	convertToGrayscale(img)
+	convertToBin(img)
+	hLines, vLines := detectLinesMorph(img)
+	gocv.IMWrite("cache/hLines.png", hLines)
+	gocv.IMWrite("cache/vLines.png", vLines)
 }
