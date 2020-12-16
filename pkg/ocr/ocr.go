@@ -15,29 +15,44 @@ const (
 	defaultTesseractConf string = "--psm 7 --oem 3"
 )
 
-func readImg(filepath string) image.Image {
-	f, _ := os.Open(filepath)
-	defer f.Close()
-
-	img, _ := png.Decode(f)
-	return img
+// readImg always reads an image assuming it's colored. The IMReadGrayScale
+// flag is not used because it produces inconsistent results compared with
+// the output of convertToGrayscale().
+func readImg(filepath string) gocv.Mat {
+	return gocv.IMRead(filepath, gocv.IMReadColor)
 }
 
-func saveImg(img image.Image, filepath string) {
-	f, _ := os.Create(filepath)
-	defer f.Close()
+// enhanceBorders makes the edges easier to detect.
+func enhanceBorders(img gocv.Mat) {
+	// convert to HSV color space to build mask
+	imgHSV := gocv.NewMat()
+	defer imgHSV.Close()
+	gocv.CvtColor(img, &imgHSV, gocv.ColorBGRToHSV)
 
-	png.Encode(f, img)
+	lowerGray, _ := gocv.NewMatFromBytes(3, 1, gocv.MatTypeCV8U, []byte{0, 0, 0})
+	defer lowerGray.Close()
+	upperGray, _ := gocv.NewMatFromBytes(3, 1, gocv.MatTypeCV8U, []byte{179, 50, 200})
+	defer upperGray.Close()
+
+	grayMask := gocv.NewMat()
+	defer grayMask.Close()
+	gocv.InRange(imgHSV, lowerGray, upperGray, &grayMask)
+	gocv.BitwiseNot(grayMask, &grayMask) // invert mask
+
+	res := gocv.NewMat()
+	defer res.Close()
+	gocv.BitwiseAndWithMask(img, img, &res, grayMask)
+	res.CopyTo(&img)
 }
 
-func convertToGrayscale(img image.Image) *image.Gray {
-	grayImg := image.NewGray(img.Bounds())
-	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
-		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			grayImg.Set(x, y, img.At(x, y))
-		}
-	}
-	return grayImg
+func convertToGrayscale(img gocv.Mat) {
+	gocv.CvtColor(img, &img, gocv.ColorBGRToGray)
+}
+
+// convertToBin applies a threshold to each pixel to transform a grayscale
+// image to a binary one.
+func convertToBin(img gocv.Mat) {
+	gocv.AdaptiveThreshold(img, &img, 255, gocv.AdaptiveThresholdMean, gocv.ThresholdBinary, 11, 2)
 }
 
 func readToBw(filepath string) gocv.Mat {
