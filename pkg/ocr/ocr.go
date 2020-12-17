@@ -3,7 +3,9 @@ package ocr
 import (
 	"image"
 	"image/color"
+	"log"
 
+	"github.com/otiai10/gosseract"
 	"gocv.io/x/gocv"
 )
 
@@ -144,8 +146,31 @@ func getIntersections(hLines gocv.Mat, vLines gocv.Mat) ([]int, []int) {
 	return iHorizontalLines, iVerticalLines
 }
 
-func textOCR() {}
+func cropImage(img gocv.Mat, x0 int, x1 int, y0 int, y1 int) gocv.Mat {
+	rect := image.Rect(x0, y0, x1, y1)
+	return img.Region(rect)
+}
 
-func cropImage() {}
+func textOCR(img string, client *gosseract.Client, whitelist string, blacklist string, engOnly bool) string {
+	if engOnly {
+		client.SetLanguage("eng")
+	} else {
+		client.SetLanguage("chi_sim", "eng")
+	}
+	client.SetPageSegMode(gosseract.PSM_SINGLE_LINE)
+	if whitelist != "" {
+		client.SetWhitelist(whitelist)
+	}
+	if blacklist != "" {
+		client.SetBlacklist(blacklist)
+	}
+
+	if err := client.SetImage(img); err != nil {
+		log.Fatal(err)
+	}
+	text, _ := client.Text()
+
+	return text
+}
 
 func getColOCRConfig() {}
