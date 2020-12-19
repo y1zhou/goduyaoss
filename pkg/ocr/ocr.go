@@ -37,8 +37,8 @@ var charWhitelist = map[string]string{
 // readImg always reads an image assuming it's colored. The IMReadGrayScale
 // flag is not used because it produces inconsistent results compared with
 // the output of convertToGrayscale().
-func readImg(filepath string) gocv.Mat {
-	return gocv.IMRead(filepath, gocv.IMReadColor)
+func readImg(imgPath string) gocv.Mat {
+	return gocv.IMRead(imgPath, gocv.IMReadColor)
 }
 
 // enhanceBorders makes the edges easier to detect.
@@ -83,7 +83,7 @@ func detectLinesMorph(imgBin gocv.Mat) (gocv.Mat, gocv.Mat) {
 
 	// Horizontal lines
 	hLines := gocv.NewMatWithSize(rows, cols, gocv.MatTypeCV8U)
-	for i := 0; i < rows; i += 30 {
+	for i := 0; i < rows; i += rowHeight {
 		gocv.Line(&hLines, image.Point{0, i}, image.Point{cols, i}, white, 1)
 	}
 	// just to make sure the line at the bottom is added
@@ -168,8 +168,8 @@ func cropImage(img gocv.Mat, x0 int, x1 int, y0 int, y1 int) gocv.Mat {
 	return img.Region(rect)
 }
 
-func textOCR(img string, client *gosseract.Client) string {
-	if err := client.SetImage(img); err != nil {
+func textOCR(imgPath string, client *gosseract.Client) string {
+	if err := client.SetImage(imgPath); err != nil {
 		log.Fatal(err)
 	}
 	text, _ := client.Text()
@@ -203,21 +203,21 @@ func getMetadata(img gocv.Mat, client *gosseract.Client, cols []int) (string, st
 	defer os.Remove(f.Name())
 
 	// SSRSpeed version
-	imgVersion := cropImage(img, 0, img.Cols(), 0, 30)
+	imgVersion := cropImage(img, 0, img.Cols(), 0, rowHeight)
 	defer imgVersion.Close()
 	gocv.IMWrite(f.Name(), imgVersion)
 	configTesseract(client, "", true)
 	resVersion := textOCR(f.Name(), client)
 
 	// Group name
-	imgGroup := cropImage(img, cols[0], cols[1], 60, 90)
+	imgGroup := cropImage(img, cols[0], cols[1], 2*rowHeight, 3*rowHeight)
 	defer imgGroup.Close()
 	gocv.IMWrite(f.Name(), imgGroup)
 	configTesseract(client, "", false)
 	resGroup := textOCR(f.Name(), client)
 
 	// last row is the timestamp
-	imgTimestamp := cropImage(img, 0, img.Cols()/2, img.Rows()-30, img.Rows())
+	imgTimestamp := cropImage(img, 0, img.Cols()/2, img.Rows()-rowHeight, img.Rows())
 	defer imgTimestamp.Close()
 	gocv.IMWrite(f.Name(), imgTimestamp)
 	configTesseract(client, "", true)
