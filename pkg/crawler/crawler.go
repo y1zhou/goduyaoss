@@ -99,11 +99,3 @@ func fetchImage(url string) image.Image {
 	}
 	return img
 }
-
-func main() {
-	doc := requestPage(pages[0])
-	providers := fetchProviders(doc)
-	for _, provider := range providers {
-		log.Printf("Provider ID: %q\n", provider)
-	}
-}
