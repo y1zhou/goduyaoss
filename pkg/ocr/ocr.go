@@ -3,7 +3,9 @@ package ocr
 import (
 	"image"
 	"image/color"
+	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/otiai10/gosseract"
 	"gocv.io/x/gocv"
@@ -16,6 +18,21 @@ var (
 	defaultTesseractConf = "--psm 7 --oem 3"
 	white                = color.RGBA{255, 255, 255, 0}
 )
+
+// The first 6 columns are always:
+//   "Group", "Remarks", "Loss", "Ping", "Google Ping", and "AvgSpeed"
+// In some cases, there is a 7th column at the end:
+//   "UDP NAT Type"
+// In some rare cases, there are two more columns at the end:
+//   "MaxSpeed" and "UDP NAT Type"
+var charWhitelist = map[string]string{
+	"Loss":         "0123456789%.",
+	"Ping":         "0123456789.",
+	"Google Ping":  "0123456789.",
+	"AvgSpeed":     "0123456789.KMGBNA",
+	"MaxSpeed":     "0123456789.KMGBNA",
+	"UDP NAT Type": "- ABDFNOPRSTUacdeiklmnoprstuwy", // See https://github.com/arantonitis/pynat/blob/c5fe553bbbb79deecedcce83c4d4d2974b139355/pynat.py#L51-L59
+}
 
 // readImg always reads an image assuming it's colored. The IMReadGrayScale
 // flag is not used because it produces inconsistent results compared with
@@ -151,26 +168,62 @@ func cropImage(img gocv.Mat, x0 int, x1 int, y0 int, y1 int) gocv.Mat {
 	return img.Region(rect)
 }
 
-func textOCR(img string, client *gosseract.Client, whitelist string, blacklist string, engOnly bool) string {
-	if engOnly {
-		client.SetLanguage("eng")
-	} else {
-		client.SetLanguage("chi_sim", "eng")
-	}
-	client.SetPageSegMode(gosseract.PSM_SINGLE_LINE)
-	if whitelist != "" {
-		client.SetWhitelist(whitelist)
-	}
-	if blacklist != "" {
-		client.SetBlacklist(blacklist)
-	}
-
+func textOCR(img string, client *gosseract.Client) string {
 	if err := client.SetImage(img); err != nil {
 		log.Fatal(err)
 	}
 	text, _ := client.Text()
 
 	return text
+}
+
+func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool) {
+	if engOnly {
+		client.SetLanguage("eng")
+	} else {
+		client.SetLanguage("chi_sim", "eng")
+	}
+	client.SetPageSegMode(gosseract.PSM_SINGLE_LINE)
+
+	whitelist, _ := charWhitelist[whitelistKey]
+	client.SetWhitelist(whitelist) // sets whitelist to "" if key not in map
+}
+
+// getMetadata retrieves information from the image that only need to be run once:
+// The SSRSpeed software version at the very top,
+// the "Group" (all rows have the same value), and
+// the time the image was generated (timestamp in the last row).
+func getMetadata(img gocv.Mat, client *gosseract.Client, cols []int) (string, string, string) {
+	// Temporary file to store the cropped images
+	f, err := ioutil.TempFile("", "goduyaoss-*.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	defer os.Remove(f.Name())
+
+	// SSRSpeed version
+	imgVersion := cropImage(img, 0, img.Cols(), 0, 30)
+	defer imgVersion.Close()
+	gocv.IMWrite(f.Name(), imgVersion)
+	configTesseract(client, "", true)
+	resVersion := textOCR(f.Name(), client)
+
+	// Group name
+	imgGroup := cropImage(img, cols[0], cols[1], 60, 90)
+	defer imgGroup.Close()
+	gocv.IMWrite(f.Name(), imgGroup)
+	configTesseract(client, "", false)
+	resGroup := textOCR(f.Name(), client)
+
+	// last row is the timestamp
+	imgTimestamp := cropImage(img, 0, img.Cols()/2, img.Rows()-30, img.Rows())
+	defer imgTimestamp.Close()
+	gocv.IMWrite(f.Name(), imgTimestamp)
+	configTesseract(client, "", true)
+	resTimestamp := textOCR(f.Name(), client)
+
+	return resVersion, resGroup, resTimestamp
 }
 
 func getColOCRConfig() {}

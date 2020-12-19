@@ -82,31 +82,57 @@ func TestTextOCR(t *testing.T) {
 
 	convertToGrayscale(img)
 
-	imgName := cropImage(img, 64, 479, 60, 90)
-	defer imgName.Close()
-
 	f, err := ioutil.TempFile("", "goduyaoss-*.png")
 	if err != nil {
 		t.Error(err)
 	}
+	defer f.Close()
 	defer os.Remove(f.Name())
-	gocv.IMWrite(f.Name(), imgName)
 
 	client := gosseract.NewClient()
 	defer client.Close()
-	nodeName := textOCR(f.Name(), client, "", "", false)
+
+	// Testcase from the "Remarks" column
+	imgName := cropImage(img, 64, 479, 60, 90)
+	defer imgName.Close()
+	gocv.IMWrite(f.Name(), imgName)
+
+	configTesseract(client, "Remarks", false)
+	nodeName := textOCR(f.Name(), client)
 	trueName := "*Ultimate|IEPL-BGP广新01|3.0|INF* - 1063 单端口"
 	if nodeName != trueName {
 		t.Errorf("OCR text is %q, but should be %q", nodeName, trueName)
 	}
 
+	// Testcase from the "AvgSpeed" column
 	imgSpeed := cropImage(img, 807, 897, 60, 90)
 	defer imgSpeed.Close()
 	gocv.IMWrite(f.Name(), imgSpeed)
 
-	nodeSpeed := textOCR(f.Name(), client, "", "", false)
-	if nodeName != "21.48MB" {
+	configTesseract(client, "AvgSpeed", true)
+	nodeSpeed := textOCR(f.Name(), client)
+	if nodeSpeed != "21.48MB" {
 		t.Errorf("OCR text is %q, but should be 21.48MB", nodeSpeed)
 	}
-	f.Close()
+}
+
+func TestGetMetadata(t *testing.T) {
+	img := readImg("testdata/sample_img.png")
+	defer img.Close()
+	convertToGrayscale(img)
+	client := gosseract.NewClient()
+	defer client.Close()
+	cols := []int{1, 64, 479, 579, 679, 807, 897, 1083}
+
+	version, group, timestamp := getMetadata(img, client, cols)
+
+	if version != "SSRSpeed Result Table (v2.7.2)" {
+		t.Errorf("Version detected is %q", version)
+	}
+	if group != "忍者云" {
+		t.Errorf("Group detected is %q", group)
+	}
+	if timestamp != "Generated at 2020-12-11 20:30:03" {
+		t.Errorf("Timestamp detected is %q", timestamp)
+	}
 }
