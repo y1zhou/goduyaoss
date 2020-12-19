@@ -3,7 +3,6 @@ package ocr
 import (
 	"image"
 	"image/color"
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -12,11 +11,10 @@ import (
 )
 
 var (
-	rowHeight            = 30
-	colWidthAvgSpeed     = 90
-	colWidthUDPNAT       = 200
-	defaultTesseractConf = "--psm 7 --oem 3"
-	white                = color.RGBA{255, 255, 255, 0}
+	rowHeight        = 30
+	colWidthAvgSpeed = 90
+	colWidthUDPNAT   = 200
+	white            = color.RGBA{255, 255, 255, 0}
 )
 
 // The first 6 columns are always:
@@ -26,19 +24,12 @@ var (
 // In some rare cases, there are two more columns at the end:
 //   "MaxSpeed" and "UDP NAT Type"
 var charWhitelist = map[string]string{
-	"Loss":         "0123456789%.",
-	"Ping":         "0123456789.",
-	"Google Ping":  "0123456789.",
-	"AvgSpeed":     "0123456789.KMGBNA",
-	"MaxSpeed":     "0123456789.KMGBNA",
-	"UDP NAT Type": "- ABDFNOPRSTUacdeiklmnoprstuwy", // See https://github.com/arantonitis/pynat/blob/c5fe553bbbb79deecedcce83c4d4d2974b139355/pynat.py#L51-L59
-}
-
-// readImg always reads an image assuming it's colored. The IMReadGrayScale
-// flag is not used because it produces inconsistent results compared with
-// the output of convertToGrayscale().
-func readImg(imgPath string) gocv.Mat {
-	return gocv.IMRead(imgPath, gocv.IMReadColor)
+	"loss":         "0123456789%.",
+	"ping":         "0123456789.",
+	"google_ping":  "0123456789.",
+	"avg_speed":    "0123456789.KMGBNA",
+	"max_speed":    "0123456789.KMGBNA",
+	"udp_nat_type": "- ABDFNOPRSTUacdeiklmnoprstuwy", // See https://github.com/arantonitis/pynat/blob/c5fe553bbbb79deecedcce83c4d4d2974b139355/pynat.py#L51-L59
 }
 
 // enhanceBorders makes the edges easier to detect.
@@ -189,16 +180,12 @@ func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool
 	client.SetWhitelist(whitelist) // sets whitelist to "" if key not in map
 }
 
-// getMetadata retrieves information from the image that only need to be run once:
-// The SSRSpeed software version at the very top,
-// the "Group" (all rows have the same value), and
+// GetMetadata retrieves information from the image that only need to be run once:
+// The SSRSpeed software version at the very top, and
 // the time the image was generated (timestamp in the last row).
-func getMetadata(img gocv.Mat, client *gosseract.Client, cols []int) (string, string, string) {
+func GetMetadata(img gocv.Mat, client *gosseract.Client) (string, string) {
 	// Temporary file to store the cropped images
-	f, err := ioutil.TempFile("", "goduyaoss-*.png")
-	if err != nil {
-		log.Fatal(err)
-	}
+	f := createTempfile("")
 	defer f.Close()
 	defer os.Remove(f.Name())
 
@@ -209,13 +196,6 @@ func getMetadata(img gocv.Mat, client *gosseract.Client, cols []int) (string, st
 	configTesseract(client, "", true)
 	resVersion := textOCR(f.Name(), client)
 
-	// Group name
-	imgGroup := cropImage(img, cols[0], cols[1], 2*rowHeight, 3*rowHeight)
-	defer imgGroup.Close()
-	gocv.IMWrite(f.Name(), imgGroup)
-	configTesseract(client, "", false)
-	resGroup := textOCR(f.Name(), client)
-
 	// last row is the timestamp
 	imgTimestamp := cropImage(img, 0, img.Cols()/2, img.Rows()-rowHeight, img.Rows())
 	defer imgTimestamp.Close()
@@ -223,7 +203,79 @@ func getMetadata(img gocv.Mat, client *gosseract.Client, cols []int) (string, st
 	configTesseract(client, "", true)
 	resTimestamp := textOCR(f.Name(), client)
 
-	return resVersion, resGroup, resTimestamp
+	return resVersion, resTimestamp
 }
 
-func getColOCRConfig() {}
+// GetHeader returns the column names based on the number of columns.
+func GetHeader(numCols int) []string {
+	var header = []string{"group", "remarks", "loss", "ping", "google_ping", "avg_speed"}
+	switch numCols {
+	case 6:
+		break
+	case 7:
+		header = append(header, "udp_nat_type")
+		break
+	case 8:
+		header = append(header, "max_speed", "udp_nat_type")
+		break
+	default:
+		log.Fatalf("%d columns detected (should be 6-8)", numCols)
+	}
+
+	return header
+}
+
+// ImgToTable runs Tesseract on each cell and returns a parsed table.
+func ImgToTable(img gocv.Mat, client *gosseract.Client) [][]string {
+	// Convert to grayscale
+	enhanceBorders(img)
+	convertToGrayscale(img)
+
+	imgGray := img.Clone()
+	defer imgGray.Close()
+
+	// Detect table borders
+	convertToBin(img)
+	hLines, vLines := detectLinesMorph(img)
+	defer hLines.Close()
+	defer vLines.Close()
+
+	rows, cols := getIntersections(hLines, vLines)
+
+	// Sanity check
+	numRows, numCols := len(rows)-1, len(cols)-1
+	header := GetHeader(numCols)
+
+	// Temp file for saving cropped images
+	f := createTempfile("")
+	defer f.Close()
+	defer os.Remove(f.Name())
+
+	// Group name stays the same for all rows
+	imgGroup := cropImage(img, cols[0], cols[1], 2*rowHeight, 3*rowHeight)
+	defer imgGroup.Close()
+	gocv.IMWrite(f.Name(), imgGroup)
+	configTesseract(client, "", false)
+	resGroup := textOCR(f.Name(), client)
+
+	// OCR
+	var res [][]string
+	// No need to parse first two and last two rows
+	for i := 2; i < numRows-2; i++ {
+		var row = []string{resGroup}
+		// Skip first column because it's handled in `getMetadata()`
+		for j := 1; j < numCols; j++ {
+			if j == 1 {
+				configTesseract(client, header[j], false)
+			} else {
+				configTesseract(client, header[j], true)
+			}
+			cell := cropImage(imgGray, cols[j], cols[j+1], rows[i], rows[i+1])
+			gocv.IMWrite(f.Name(), cell)
+			text := textOCR(f.Name(), client)
+			row = append(row, text)
+		}
+		res = append(res, row)
+	}
+	return res
+}

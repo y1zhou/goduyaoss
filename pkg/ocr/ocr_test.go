@@ -1,7 +1,6 @@
 package ocr
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -82,10 +81,7 @@ func TestTextOCR(t *testing.T) {
 
 	convertToGrayscale(img)
 
-	f, err := ioutil.TempFile("", "goduyaoss-*.png")
-	if err != nil {
-		t.Error(err)
-	}
+	f := createTempfile("")
 	defer f.Close()
 	defer os.Remove(f.Name())
 
@@ -122,17 +118,29 @@ func TestGetMetadata(t *testing.T) {
 	convertToGrayscale(img)
 	client := gosseract.NewClient()
 	defer client.Close()
-	cols := []int{1, 64, 479, 579, 679, 807, 897, 1083}
 
-	version, group, timestamp := getMetadata(img, client, cols)
+	version, timestamp := GetMetadata(img, client)
 
 	if version != "SSRSpeed Result Table (v2.7.2)" {
 		t.Errorf("Version detected is %q", version)
 	}
-	if group != "忍者云" {
-		t.Errorf("Group detected is %q", group)
-	}
 	if timestamp != "Generated at 2020-12-11 20:30:03" {
 		t.Errorf("Timestamp detected is %q", timestamp)
+	}
+}
+
+func TestImgToTable(t *testing.T) {
+	img := readImg("testdata/sample_img.png")
+	defer img.Close()
+
+	client := gosseract.NewClient()
+	defer client.Close()
+	res := ImgToTable(img, client)
+
+	if len(res) != 45 {
+		t.Errorf("Should be 45 rows, found %d", len(res))
+	}
+	if len(res[0]) != 7 {
+		t.Errorf("Should be 7 columns, found %d", len(res[0]))
 	}
 }
