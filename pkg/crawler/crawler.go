@@ -10,10 +10,11 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-var pages = [3]string{
-	"https://www.duyaoss.com/archives/1031/",
-	"https://www.duyaoss.com/archives/3/",
-	"https://www.duyaoss.com/archives/1/",
+// Pages - the pages to crawl.
+var Pages = map[string]string{
+	"ChinaMobile":  "https://www.duyaoss.com/archives/1031/",
+	"ChinaUnicom":  "https://www.duyaoss.com/archives/3/",
+	"ChinaTelecom": "https://www.duyaoss.com/archives/1/",
 }
 
 // Provider holds the information about a provider. It's possible for a provider
@@ -24,8 +25,8 @@ type Provider struct {
 	Subgroup []Provider
 }
 
-// Given a URL, return the response as a goquery document.
-func requestPage(url string) *goquery.Document {
+// RequestPage - Given a URL, return the response as a goquery document.
+func RequestPage(url string) *goquery.Document {
 	res, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
@@ -43,9 +44,9 @@ func requestPage(url string) *goquery.Document {
 	return doc
 }
 
-// Find the providers in the <h2> elements, and parse the result into
-// an array of `Provider` structs.
-func fetchProviders(doc *goquery.Document) []Provider {
+// FetchProviders - Find the providers in the <h2> elements,
+// and parse the result into an array of `Provider` structs.
+func FetchProviders(doc *goquery.Document) []Provider {
 	var providers []Provider
 	regexProvider := regexp.MustCompile(`^\d*\.`)
 	doc.Find("h2").Each(func(i int, s *goquery.Selection) {
@@ -83,7 +84,8 @@ func fetchProviders(doc *goquery.Document) []Provider {
 	return providers
 }
 
-func fetchImage(url string) image.Image {
+// FetchImage - Given the URL to an image, return an `image.Image` interface.
+func FetchImage(url string) image.Image {
 	res, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
