@@ -94,7 +94,7 @@ func TestTextOCR(t *testing.T) {
 	gocv.IMWrite(f.Name(), imgName)
 
 	configTesseract(client, "Remarks", false)
-	nodeName := textOCR(f.Name(), client)
+	nodeName := fileOCR(f.Name(), client)
 	trueName := "*Ultimate|IEPL-BGP广新01|3.0|INF* - 1063 单端口"
 	if nodeName != trueName {
 		t.Errorf("OCR text is %q, but should be %q", nodeName, trueName)
@@ -106,7 +106,7 @@ func TestTextOCR(t *testing.T) {
 	gocv.IMWrite(f.Name(), imgSpeed)
 
 	configTesseract(client, "AvgSpeed", true)
-	nodeSpeed := textOCR(f.Name(), client)
+	nodeSpeed := fileOCR(f.Name(), client)
 	if nodeSpeed != "21.48MB" {
 		t.Errorf("OCR text is %q, but should be 21.48MB", nodeSpeed)
 	}
