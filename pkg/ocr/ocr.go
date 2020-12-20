@@ -91,21 +91,8 @@ func GetHeader(numCols int) []string {
 }
 
 // ImgToTable runs Tesseract on each cell and returns a parsed table.
-func ImgToTable(img gocv.Mat, client *gosseract.Client) [][]string {
-	// Convert to grayscale
-	enhanceBorders(img)
-	convertToGrayscale(img)
-
-	imgGray := img.Clone()
-	defer imgGray.Close()
-
-	// Detect table borders
-	convertToBin(img)
-	hLines, vLines := detectLinesMorph(img)
-	defer hLines.Close()
-	defer vLines.Close()
-
-	rows, cols := getIntersections(hLines, vLines)
+func ImgToTable(img gocv.Mat) [][]string {
+	rows, cols := GetBorderIndex(img)
 
 	// Sanity check
 	numRows, numCols := len(rows)-1, len(cols)-1
@@ -120,27 +107,43 @@ func ImgToTable(img gocv.Mat, client *gosseract.Client) [][]string {
 	imgGroup := cropImage(img, cols[0], cols[1], 2*rowHeight, 3*rowHeight)
 	defer imgGroup.Close()
 	gocv.IMWrite(f.Name(), imgGroup)
-	configTesseract(client, "", false)
-	resGroup := textOCR(f.Name(), client)
 
-	// OCR
-	var res [][]string
-	// No need to parse first two and last two rows
+	client := gosseract.NewClient()
+	defer client.Close()
+	configTesseract(client, "", false)
+	txtGroup := fileOCR(f.Name(), client)
+
+	// OCR - no need to parse first two and last two rows.
+	res := make([][]string, numRows-4)
+	var wg sync.WaitGroup
+
 	for i := 2; i < numRows-2; i++ {
-		var row = []string{resGroup}
-		// Skip first column because it's handled in `getMetadata()`
-		for j := 1; j < numCols; j++ {
-			if j == 1 {
-				configTesseract(client, header[j], false)
-			} else {
-				configTesseract(client, header[j], true)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			iFile := createTempfile("")
+			defer iFile.Close()
+			defer os.Remove(iFile.Name())
+
+			var row = []string{txtGroup}
+			localClient := gosseract.NewClient()
+			defer localClient.Close()
+			// Skip first column because it's already handled
+			for j := 1; j < numCols; j++ {
+				if j == 1 {
+					configTesseract(localClient, header[j], false)
+				} else {
+					configTesseract(localClient, header[j], true)
+				}
+				cell := cropImage(img, cols[j], cols[j+1], rows[i], rows[i+1])
+				gocv.IMWrite(iFile.Name(), cell)
+				text := fileOCR(iFile.Name(), localClient)
+				row = append(row, text)
 			}
-			cell := cropImage(imgGray, cols[j], cols[j+1], rows[i], rows[i+1])
-			gocv.IMWrite(f.Name(), cell)
-			text := textOCR(f.Name(), client)
-			row = append(row, text)
-		}
-		res = append(res, row)
+			res[i-2] = row
+		}(i)
 	}
+	wg.Wait()
 	return res
 }

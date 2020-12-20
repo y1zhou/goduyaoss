@@ -133,9 +133,9 @@ func TestImgToTable(t *testing.T) {
 	img := readImg("testdata/sample_img.png")
 	defer img.Close()
 
-	client := gosseract.NewClient()
-	defer client.Close()
-	res := ImgToTable(img, client)
+	enhanceBorders(img)
+	convertToGrayscale(img)
+	res := ImgToTable(img)
 
 	if len(res) != 45 {
 		t.Errorf("Should be 45 rows, found %d", len(res))
