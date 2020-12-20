@@ -1,7 +1,6 @@
 package ocr
 
 import (
-	"os"
 	"testing"
 
 	"github.com/otiai10/gosseract"
@@ -75,15 +74,11 @@ func TestGetIntersections(t *testing.T) {
 	}
 }
 
-func TestTextOCR(t *testing.T) {
+func TestFileOCR(t *testing.T) {
 	img := readImg("testdata/sample_img.png")
 	defer img.Close()
 
 	convertToGrayscale(img)
-
-	f := createTempfile("")
-	defer f.Close()
-	defer os.Remove(f.Name())
 
 	client := gosseract.NewClient()
 	defer client.Close()
@@ -91,10 +86,9 @@ func TestTextOCR(t *testing.T) {
 	// Testcase from the "Remarks" column
 	imgName := cropImage(img, 64, 479, 60, 90)
 	defer imgName.Close()
-	gocv.IMWrite(f.Name(), imgName)
 
 	configTesseract(client, "Remarks", false)
-	nodeName := fileOCR(f.Name(), client)
+	nodeName := imgOCR(imgName, client)
 	trueName := "*Ultimate|IEPL-BGP广新01|3.0|INF* - 1063 单端口"
 	if nodeName != trueName {
 		t.Errorf("OCR text is %q, but should be %q", nodeName, trueName)
@@ -103,10 +97,9 @@ func TestTextOCR(t *testing.T) {
 	// Testcase from the "AvgSpeed" column
 	imgSpeed := cropImage(img, 807, 897, 60, 90)
 	defer imgSpeed.Close()
-	gocv.IMWrite(f.Name(), imgSpeed)
 
 	configTesseract(client, "AvgSpeed", true)
-	nodeSpeed := fileOCR(f.Name(), client)
+	nodeSpeed := imgOCR(imgSpeed, client)
 	if nodeSpeed != "21.48MB" {
 		t.Errorf("OCR text is %q, but should be 21.48MB", nodeSpeed)
 	}

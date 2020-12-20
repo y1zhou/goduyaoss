@@ -2,7 +2,6 @@ package ocr
 
 import (
 	"log"
-	"os"
 	"sync"
 
 	"github.com/otiai10/gosseract"
@@ -33,6 +32,23 @@ func fileOCR(imgPath string, client *gosseract.Client) string {
 	return text
 }
 
+func imgOCR(imgMat gocv.Mat, client *gosseract.Client) string {
+	// Mat -> image.Image
+	imgMatClone := imgMat.Clone()
+	defer imgMatClone.Close()
+	img, err := imgMatClone.ToImage()
+	if err != nil {
+		log.Fatalf("Can't convert gocv.Mat to image.Image: %q", err)
+	}
+
+	if err := client.SetImageFromBytes(imgToBytes(img)); err != nil {
+		log.Fatal(err)
+	}
+	text, _ := client.Text()
+
+	return text
+}
+
 func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool) {
 	if engOnly {
 		client.SetLanguage("eng")
@@ -49,24 +65,17 @@ func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool
 // The SSRSpeed software version at the very top, and
 // the time the image was generated (timestamp in the last row).
 func GetMetadata(img gocv.Mat, client *gosseract.Client) (string, string) {
-	// Temporary file to store the cropped images
-	f := createTempfile("")
-	defer f.Close()
-	defer os.Remove(f.Name())
-
 	// SSRSpeed version
 	imgVersion := cropImage(img, 0, img.Cols(), 0, rowHeight)
 	defer imgVersion.Close()
-	gocv.IMWrite(f.Name(), imgVersion)
 	configTesseract(client, "", true)
-	resVersion := fileOCR(f.Name(), client)
+	resVersion := imgOCR(imgVersion, client)
 
 	// last row is the timestamp
 	imgTimestamp := cropImage(img, 0, img.Cols()/2, img.Rows()-rowHeight, img.Rows())
 	defer imgTimestamp.Close()
-	gocv.IMWrite(f.Name(), imgTimestamp)
 	configTesseract(client, "", true)
-	resTimestamp := fileOCR(f.Name(), client)
+	resTimestamp := imgOCR(imgTimestamp, client)
 
 	return resVersion, resTimestamp
 }
@@ -98,20 +107,14 @@ func ImgToTable(img gocv.Mat) [][]string {
 	numRows, numCols := len(rows)-1, len(cols)-1
 	header := GetHeader(numCols)
 
-	// Temp file for saving cropped images
-	f := createTempfile("")
-	defer f.Close()
-	defer os.Remove(f.Name())
-
 	// Group name stays the same for all rows
 	imgGroup := cropImage(img, cols[0], cols[1], 2*rowHeight, 3*rowHeight)
 	defer imgGroup.Close()
-	gocv.IMWrite(f.Name(), imgGroup)
 
 	client := gosseract.NewClient()
 	defer client.Close()
 	configTesseract(client, "", false)
-	txtGroup := fileOCR(f.Name(), client)
+	txtGroup := imgOCR(imgGroup, client)
 
 	// OCR - no need to parse first two and last two rows.
 	res := make([][]string, numRows-4)
@@ -122,11 +125,8 @@ func ImgToTable(img gocv.Mat) [][]string {
 		go func(i int) {
 			defer wg.Done()
 
-			iFile := createTempfile("")
-			defer iFile.Close()
-			defer os.Remove(iFile.Name())
-
-			var row = []string{txtGroup}
+			row := make([]string, numCols)
+			row[0] = txtGroup
 			localClient := gosseract.NewClient()
 			defer localClient.Close()
 			// Skip first column because it's already handled
@@ -137,9 +137,10 @@ func ImgToTable(img gocv.Mat) [][]string {
 					configTesseract(localClient, header[j], true)
 				}
 				cell := cropImage(img, cols[j], cols[j+1], rows[i], rows[i+1])
-				gocv.IMWrite(iFile.Name(), cell)
-				text := fileOCR(iFile.Name(), localClient)
-				row = append(row, text)
+				defer cell.Close()
+
+				text := imgOCR(cell, localClient)
+				row[j] = text
 			}
 			res[i-2] = row
 		}(i)
