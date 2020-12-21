@@ -2,7 +2,8 @@ package ocr
 
 import (
 	"log"
-	"sync"
+	"regexp"
+	"strings"
 
 	"github.com/otiai10/gosseract"
 	"gocv.io/x/gocv"
@@ -34,14 +35,12 @@ func fileOCR(imgPath string, client *gosseract.Client) string {
 
 func imgOCR(imgMat gocv.Mat, client *gosseract.Client) string {
 	// Mat -> image.Image
-	imgMatClone := imgMat.Clone()
-	defer imgMatClone.Close()
-	img, err := imgMatClone.ToImage()
+	imgByte, err := gocv.IMEncode(gocv.PNGFileExt, imgMat)
 	if err != nil {
-		log.Fatalf("Can't convert gocv.Mat to image.Image: %q", err)
+		log.Fatalf("Can't convert gocv.Mat to []byte: %q", err)
 	}
 
-	if err := client.SetImageFromBytes(imgToBytes(img)); err != nil {
+	if err := client.SetImageFromBytes(imgByte); err != nil {
 		log.Fatal(err)
 	}
 	text, _ := client.Text()
@@ -111,14 +110,17 @@ func GetHeader(numCols int) []string {
 
 // ImgToTable runs Tesseract on each cell and returns a parsed table.
 func ImgToTable(img gocv.Mat) [][]string {
-	rows, cols := GetBorderIndex(img)
+	rows, cols := getBorderIndex(img)
 
-	// Sanity check
+	// Remove watermark and background colors
+	removeColor(&img, cols)
+
+	// Header names
 	numRows, numCols := len(rows)-1, len(cols)-1
 	header := GetHeader(numCols)
 
 	// Group name stays the same for all rows
-	imgGroup := cropImage(img, cols[0], cols[1], 2*rowHeight, 3*rowHeight)
+	imgGroup := cropImage(img, cols[0], cols[1], rows[2], rows[3])
 	defer imgGroup.Close()
 
 	client := gosseract.NewClient()
@@ -126,35 +128,57 @@ func ImgToTable(img gocv.Mat) [][]string {
 	configTesseract(client, "", false, false)
 	txtGroup := imgOCR(imgGroup, client)
 
+	// Duplicate to make first column
+	firstCol := make([]string, numRows-4)
+	for i := range firstCol {
+		firstCol[i] = txtGroup
+	}
+
 	// OCR - no need to parse first two and last two rows.
-	res := make([][]string, numRows-4)
-	var wg sync.WaitGroup
+	res := make([][]string, numCols)
+	res[0] = firstCol
 
-	for i := 2; i < numRows-2; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+	newLineRegex := regexp.MustCompile(`\n+`)
+	for j := 1; j < numCols; j++ {
+		// Try to use column mode first because it's much faster
+		if j == 1 {
+			configTesseract(client, header[j], false, true)
+		} else {
+			configTesseract(client, header[j], true, true)
+		}
+		col := cropImage(img, cols[j], cols[j+1], rows[2], rows[numRows-2])
+		defer col.Close()
 
-			row := make([]string, numCols)
-			row[0] = txtGroup
-			localClient := gosseract.NewClient()
-			defer localClient.Close()
-			// Skip first column because it's already handled
-			for j := 1; j < numCols; j++ {
+		text := imgOCR(col, client)
+
+		text = newLineRegex.ReplaceAllString(text, "\n")
+		txtCol := strings.Split(text, "\n")
+
+		// If the number of rows is incorrect, run OCR on each cell.
+		// This is much slower but also more accurate.
+		if len(txtCol) != numRows {
+			txtCol = make([]string, numRows-4)
+			for i := 2; i < numRows-2; i++ {
+				// localClient := gosseract.NewClient()
+				// defer localClient.Close()
 				if j == 1 {
-					configTesseract(localClient, header[j], false)
+					configTesseract(client, header[j], false, false)
 				} else {
-					configTesseract(localClient, header[j], true)
+					configTesseract(client, header[j], true, false)
 				}
+
 				cell := cropImage(img, cols[j], cols[j+1], rows[i], rows[i+1])
 				defer cell.Close()
 
-				text := imgOCR(cell, localClient)
-				row[j] = text
+				txtCol[i-2] = imgOCR(cell, client)
 			}
-			res[i-2] = row
-		}(i)
+		}
+
+		for i := range txtCol {
+			txtCol[i] = strings.TrimSpace(txtCol[i])
+		}
+
+		res[j] = txtCol
 	}
-	wg.Wait()
 	return res
 }

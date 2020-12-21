@@ -7,22 +7,13 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// Check the output file and see if there's changes in the boarder.
-func BenchmarkEnhanceBorders(t *testing.B) {
-	img := readImg("testdata/sample_img.png")
-	defer img.Close()
-
-	enhanceBorders(img)
-	gocv.IMWrite("cache/sample_img_enhanced.png", img)
-}
-
 // Check if the output file is grayscale.
 func BenchmarkConvertToGrayscale(t *testing.B) {
 	img := readImg("testdata/sample_img.png")
 	defer img.Close()
 
 	convertToGrayscale(img)
-	gocv.IMWrite("cache/sample_img_gray.png", img)
+	gocv.IMWrite("sample_img_gray.png", img)
 }
 
 // Check if the output file is black and white.
@@ -32,7 +23,7 @@ func BenchmarkConvertToBin(t *testing.B) {
 
 	convertToGrayscale(img)
 	convertToBin(img)
-	gocv.IMWrite("cache/sample_img_binary.png", img)
+	gocv.IMWrite("sample_img_binary.png", img)
 }
 
 // Check if the borders in the output file match the original borders.
@@ -40,7 +31,6 @@ func BenchmarkDetectLinesMorph(t *testing.B) {
 	img := readImg("testdata/sample_img.png")
 	defer img.Close()
 
-	enhanceBorders(img)
 	convertToGrayscale(img)
 	convertToBin(img)
 	hLines, vLines := detectLinesMorph(img)
@@ -50,14 +40,13 @@ func BenchmarkDetectLinesMorph(t *testing.B) {
 	borders := gocv.NewMat()
 	defer borders.Close()
 	gocv.BitwiseOr(hLines, vLines, &borders)
-	gocv.IMWrite("cache/borders.png", borders)
+	gocv.IMWrite("borders.png", borders)
 }
 
 func TestGetIntersections(t *testing.T) {
 	img := readImg("testdata/sample_img.png")
 	defer img.Close()
 
-	enhanceBorders(img)
 	convertToGrayscale(img)
 	convertToBin(img)
 	hLines, vLines := detectLinesMorph(img)
@@ -87,7 +76,7 @@ func TestFileOCR(t *testing.T) {
 	imgName := cropImage(img, 64, 479, 60, 90)
 	defer imgName.Close()
 
-	configTesseract(client, "Remarks", false)
+	configTesseract(client, "Remarks", false, false)
 	nodeName := imgOCR(imgName, client)
 	trueName := "*Ultimate|IEPL-BGP广新01|3.0|INF* - 1063 单端口"
 	if nodeName != trueName {
@@ -98,7 +87,7 @@ func TestFileOCR(t *testing.T) {
 	imgSpeed := cropImage(img, 807, 897, 60, 90)
 	defer imgSpeed.Close()
 
-	configTesseract(client, "AvgSpeed", true)
+	configTesseract(client, "AvgSpeed", true, false)
 	nodeSpeed := imgOCR(imgSpeed, client)
 	if nodeSpeed != "21.48MB" {
 		t.Errorf("OCR text is %q, but should be 21.48MB", nodeSpeed)
@@ -126,14 +115,16 @@ func TestImgToTable(t *testing.T) {
 	img := readImg("testdata/sample_img.png")
 	defer img.Close()
 
-	enhanceBorders(img)
-	convertToGrayscale(img)
 	res := ImgToTable(img)
 
-	if len(res) != 45 {
-		t.Errorf("Should be 45 rows, found %d", len(res))
+	if len(res) != 7 {
+		t.Errorf("Should be 7 columns, found %d\n", len(res))
 	}
-	if len(res[0]) != 7 {
-		t.Errorf("Should be 7 columns, found %d", len(res[0]))
+	for i := range res {
+		if len(res[i]) != 45 {
+			t.Errorf("Should be 45 rows, found %d in column %d\n",
+				len(res[0]), i)
+		}
 	}
+
 }
