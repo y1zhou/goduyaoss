@@ -14,41 +14,31 @@ var (
 	white            = color.RGBA{255, 255, 255, 0}
 )
 
-// Preprocess converts an `image.Image` to a `Mat` in grayscale.
-func Preprocess(img image.Image) gocv.Mat {
-	imgMat := ImgToMat(img)
-	defer imgMat.Close()
-
-	// Convert to grayscale
-	enhanceBorders(imgMat)
-	convertToGrayscale(imgMat)
-
-	return imgMat
-}
-
 // GetBorderIndex returns the indices of the rows and columns.
-func GetBorderIndex(imgGray gocv.Mat) ([]int, []int) {
-	img := imgGray.Clone()
-	defer img.Close()
+func getBorderIndex(img gocv.Mat) ([]int, []int) {
+	imgGray := img.Clone()
+	defer imgGray.Close()
 
-	convertToBin(img)
-	hLines, vLines := detectLinesMorph(img)
+	convertToGrayscale(imgGray)
+	convertToBin(imgGray)
+	hLines, vLines := detectLinesMorph(imgGray)
 	defer hLines.Close()
 	defer vLines.Close()
 	rows, cols := getIntersections(hLines, vLines)
 	return rows, cols
 }
 
-// enhanceBorders makes the edges easier to detect.
-func enhanceBorders(img gocv.Mat) {
+// removeColor - vertical colored text in between the "Remarks" and "Loss" columns.
+func removeColor(img *gocv.Mat, cols []int) {
 	// convert to HSV color space to build mask
 	imgHSV := gocv.NewMat()
 	defer imgHSV.Close()
-	gocv.CvtColor(img, &imgHSV, gocv.ColorBGRToHSV)
+	gocv.CvtColor(*img, &imgHSV, gocv.ColorBGRToHSV)
 
+	// Detect gray pixels
 	lowerGray, _ := gocv.NewMatFromBytes(3, 1, gocv.MatTypeCV8U, []byte{0, 0, 0})
 	defer lowerGray.Close()
-	upperGray, _ := gocv.NewMatFromBytes(3, 1, gocv.MatTypeCV8U, []byte{179, 50, 200})
+	upperGray, _ := gocv.NewMatFromBytes(3, 1, gocv.MatTypeCV8U, []byte{180, 255, 254})
 	defer upperGray.Close()
 
 	grayMask := gocv.NewMat()
@@ -56,10 +46,7 @@ func enhanceBorders(img gocv.Mat) {
 	gocv.InRange(imgHSV, lowerGray, upperGray, &grayMask)
 	gocv.BitwiseNot(grayMask, &grayMask) // invert mask
 
-	res := gocv.NewMat()
-	defer res.Close()
-	gocv.BitwiseAndWithMask(img, img, &res, grayMask)
-	res.CopyTo(&img)
+	grayMask.CopyTo(img)
 }
 
 func convertToGrayscale(img gocv.Mat) {

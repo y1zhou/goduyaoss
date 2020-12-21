@@ -49,11 +49,14 @@ func imgOCR(imgMat gocv.Mat, client *gosseract.Client) string {
 	return text
 }
 
-func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool) {
+func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool, colMode bool) {
 	if engOnly {
 		client.SetLanguage("eng")
 	} else {
 		client.SetLanguage("chi_sim", "eng")
+	}
+	if colMode {
+		client.SetPageSegMode(gosseract.PSM_SINGLE_BLOCK)
 	}
 	client.SetPageSegMode(gosseract.PSM_SINGLE_LINE)
 
@@ -65,16 +68,23 @@ func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool
 // The SSRSpeed software version at the very top, and
 // the time the image was generated (timestamp in the last row).
 func GetMetadata(img gocv.Mat, client *gosseract.Client) (string, string) {
+	// Convert to grayscale
+	imgGray := img.Clone()
+	defer imgGray.Close()
+	convertToGrayscale(imgGray)
+
 	// SSRSpeed version
-	imgVersion := cropImage(img, 0, img.Cols(), 0, rowHeight)
+	imgVersion := cropImage(imgGray, 0, imgGray.Cols(), 0, rowHeight)
 	defer imgVersion.Close()
-	configTesseract(client, "", true)
+	configTesseract(client, "", true, false)
 	resVersion := imgOCR(imgVersion, client)
 
 	// last row is the timestamp
-	imgTimestamp := cropImage(img, 0, img.Cols()/2, img.Rows()-rowHeight, img.Rows())
+	imgTimestamp := cropImage(imgGray,
+		0, imgGray.Cols()/2,
+		imgGray.Rows()-rowHeight, imgGray.Rows())
 	defer imgTimestamp.Close()
-	configTesseract(client, "", true)
+	configTesseract(client, "", true, false)
 	resTimestamp := imgOCR(imgTimestamp, client)
 
 	return resVersion, resTimestamp
@@ -113,7 +123,7 @@ func ImgToTable(img gocv.Mat) [][]string {
 
 	client := gosseract.NewClient()
 	defer client.Close()
-	configTesseract(client, "", false)
+	configTesseract(client, "", false, false)
 	txtGroup := imgOCR(imgGroup, client)
 
 	// OCR - no need to parse first two and last two rows.
