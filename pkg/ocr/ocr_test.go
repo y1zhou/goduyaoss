@@ -2,45 +2,26 @@ package ocr
 
 import (
 	"testing"
+	"time"
 
 	"github.com/otiai10/gosseract"
-	"gocv.io/x/gocv"
 )
 
-// Check if the output file is grayscale.
-func BenchmarkConvertToGrayscale(t *testing.B) {
-	img := readImg("testdata/sample_img.png")
-	defer img.Close()
-
-	convertToGrayscale(img)
-	gocv.IMWrite("sample_img_gray.png", img)
+func TestCleanVersion(t *testing.T) {
+	s := "SSRSpeed Result Table (v2.7.2)"
+	cleanVersion(&s)
+	if s != "2.7.2" {
+		t.Fatalf("Found SSRSpeed version %q, should be v2.7.2\n", s)
+	}
 }
 
-// Check if the output file is black and white.
-func BenchmarkConvertToBin(t *testing.B) {
-	img := readImg("testdata/sample_img.png")
-	defer img.Close()
-
-	convertToGrayscale(img)
-	convertToBin(img)
-	gocv.IMWrite("sample_img_binary.png", img)
-}
-
-// Check if the borders in the output file match the original borders.
-func BenchmarkDetectLinesMorph(t *testing.B) {
-	img := readImg("testdata/sample_img.png")
-	defer img.Close()
-
-	convertToGrayscale(img)
-	convertToBin(img)
-	hLines, vLines := detectLinesMorph(img)
-	defer hLines.Close()
-	defer vLines.Close()
-
-	borders := gocv.NewMat()
-	defer borders.Close()
-	gocv.BitwiseOr(hLines, vLines, &borders)
-	gocv.IMWrite("borders.png", borders)
+func TestCleanTimestamp(t *testing.T) {
+	s := "Generated at 2020-12-11 20:30:03"
+	ans, _ := time.Parse("2006-01-02T15:04:05", "2020-12-11T20:30:03")
+	res := cleanTimestamp(&s)
+	if res != ans {
+		t.Fatalf("Found timestamp %q, should be %q\n", res, ans)
+	}
 }
 
 func TestGetIntersections(t *testing.T) {
@@ -97,16 +78,16 @@ func TestFileOCR(t *testing.T) {
 func TestGetMetadata(t *testing.T) {
 	img := readImg("testdata/sample_img.png")
 	defer img.Close()
-	convertToGrayscale(img)
 	client := gosseract.NewClient()
 	defer client.Close()
 
 	version, timestamp := GetMetadata(img, client)
 
-	if version != "SSRSpeed Result Table (v2.7.2)" {
+	if version != "2.7.2" {
 		t.Errorf("Version detected is %q", version)
 	}
-	if timestamp != "Generated at 2020-12-11 20:30:03" {
+	ans, _ := time.Parse("2006-01-02T15:04:05", "2020-12-11T20:30:03")
+	if timestamp != ans {
 		t.Errorf("Timestamp detected is %q", timestamp)
 	}
 }

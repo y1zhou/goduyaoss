@@ -4,6 +4,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/otiai10/gosseract"
 	"gocv.io/x/gocv"
@@ -66,7 +67,7 @@ func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool
 // GetMetadata retrieves information from the image that only need to be run once:
 // The SSRSpeed software version at the very top, and
 // the time the image was generated (timestamp in the last row).
-func GetMetadata(img gocv.Mat, client *gosseract.Client) (string, string) {
+func GetMetadata(img gocv.Mat, client *gosseract.Client) (string, time.Time) {
 	// Convert to grayscale
 	imgGray := img.Clone()
 	defer imgGray.Close()
@@ -77,6 +78,7 @@ func GetMetadata(img gocv.Mat, client *gosseract.Client) (string, string) {
 	defer imgVersion.Close()
 	configTesseract(client, "", true, false)
 	resVersion := imgOCR(imgVersion, client)
+	cleanVersion(&resVersion)
 
 	// last row is the timestamp
 	imgTimestamp := cropImage(imgGray,
@@ -84,7 +86,8 @@ func GetMetadata(img gocv.Mat, client *gosseract.Client) (string, string) {
 		imgGray.Rows()-rowHeight, imgGray.Rows())
 	defer imgTimestamp.Close()
 	configTesseract(client, "", true, false)
-	resTimestamp := imgOCR(imgTimestamp, client)
+	resTimestr := imgOCR(imgTimestamp, client)
+	resTimestamp := cleanTimestamp(&resTimestr)
 
 	return resVersion, resTimestamp
 }

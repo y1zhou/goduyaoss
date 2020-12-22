@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
+	"time"
 
 	"gocv.io/x/gocv"
 )
@@ -40,4 +42,20 @@ func ImgToMat(img image.Image) gocv.Mat {
 		log.Fatal(err)
 	}
 	return imgMat
+}
+
+func cleanVersion(s *string) {
+	regexVersion := regexp.MustCompile(`^.*v\s*(\d+\.\d+\.\d+).*$`)
+	*s = regexVersion.ReplaceAllString(*s, `$1`)
+}
+
+func cleanTimestamp(s *string) time.Time {
+	regexTime := regexp.MustCompile(`^.*?(\d+-\d+-\d+)\s+(\d+:\d+:\d+).*$`)
+	sNew := regexTime.ReplaceAllString(*s, `${1}T$2`)
+	res, err := time.Parse("2006-01-02T15:04:05", sNew)
+	if err != nil {
+		log.Printf("Error parsing timestamp in %q\n", *s)
+		return time.Time{}
+	}
+	return res
 }
