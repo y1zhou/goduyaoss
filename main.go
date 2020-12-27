@@ -14,12 +14,12 @@ func main() {
 	log.Printf("Crawling %s\n", netProvider)
 	doc := crawler.RequestPage(url)
 	providers := crawler.FetchProviders(doc)
-	provTest := providers[:10]
+	provTest := providers[5:10]
 
 	var wg sync.WaitGroup
-	const numWorkers int = 5 // TODO: this should be passed from the cli
+	const numWorkers int = 3 // TODO: this should be passed from the cli
 	queue := make(chan ocr.Job, numWorkers)
-	res := make(chan string, len(providers)*3)
+	res := make(chan [][]string, len(providers)*3)
 
 	for w := 0; w < numWorkers; w++ {
 		wg.Add(1)
@@ -47,7 +47,7 @@ func main() {
 	close(res)
 
 	for s := range res {
-		log.Println(s)
+		ocr.PrintTable(s)
 	}
 
 	// for netProvider, url := range crawler.Pages {

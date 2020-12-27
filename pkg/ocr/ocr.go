@@ -118,6 +118,9 @@ func ImgToTable(img gocv.Mat) [][]string {
 	// Remove watermark and background colors
 	removeColor(&img, cols)
 
+	// Enhance row borders
+	drawRowBorders(&img, rows)
+
 	// Header names
 	numRows, numCols := len(rows)-1, len(cols)-1
 	header := GetHeader(numCols)
@@ -127,7 +130,7 @@ func ImgToTable(img gocv.Mat) [][]string {
 	defer imgGroup.Close()
 
 	client := gosseract.NewClient()
-	defer client.Close()
+
 	configTesseract(client, "", false, false)
 	txtGroup := imgOCR(imgGroup, client)
 
@@ -153,23 +156,19 @@ func ImgToTable(img gocv.Mat) [][]string {
 		defer col.Close()
 
 		text := imgOCR(col, client)
-
 		text = newLineRegex.ReplaceAllString(text, "\n")
 		txtCol := strings.Split(text, "\n")
 
 		// If the number of rows is incorrect, run OCR on each cell.
 		// This is much slower but also more accurate.
-		if len(txtCol) != numRows {
+		if len(txtCol) != numRows-4 {
 			txtCol = make([]string, numRows-4)
+			if j == 1 {
+				configTesseract(client, header[j], false, false)
+			} else {
+				configTesseract(client, header[j], true, false)
+			}
 			for i := 2; i < numRows-2; i++ {
-				// localClient := gosseract.NewClient()
-				// defer localClient.Close()
-				if j == 1 {
-					configTesseract(client, header[j], false, false)
-				} else {
-					configTesseract(client, header[j], true, false)
-				}
-
 				cell := cropImage(img, cols[j], cols[j+1], rows[i], rows[i+1])
 				defer cell.Close()
 
@@ -183,5 +182,6 @@ func ImgToTable(img gocv.Mat) [][]string {
 
 		res[j] = txtCol
 	}
+	client.Close()
 	return res
 }

@@ -12,6 +12,7 @@ var (
 	colWidthAvgSpeed = 90
 	colWidthUDPNAT   = 200
 	white            = color.RGBA{255, 255, 255, 0}
+	black            = color.RGBA{0, 0, 0, 0}
 )
 
 // GetBorderIndex returns the indices of the rows and columns.
@@ -146,6 +147,12 @@ func getIntersections(hLines gocv.Mat, vLines gocv.Mat) ([]int, []int) {
 	}
 
 	return iHorizontalLines, iVerticalLines
+}
+
+func drawRowBorders(img *gocv.Mat, rows []int) {
+	for _, row := range rows {
+		gocv.Line(img, image.Point{0, row}, image.Point{img.Cols(), row}, black, 2)
+	}
 }
 
 func cropImage(img gocv.Mat, x0 int, x1 int, y0 int, y1 int) gocv.Mat {

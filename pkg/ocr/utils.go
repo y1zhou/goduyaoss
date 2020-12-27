@@ -2,6 +2,7 @@ package ocr
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/png"
 	"io/ioutil"
@@ -58,4 +59,19 @@ func cleanTimestamp(s *string) time.Time {
 		return time.Time{}
 	}
 	return res
+}
+
+func PrintTable(t [][]string) {
+	headers := GetHeader(len(t))
+	fmt.Printf("%s", headers[0])
+	for i := 1; i < len(headers); i++ {
+		fmt.Printf(",%s", headers[i])
+	}
+	for i := 0; i < len(t[0]); i++ {
+		fmt.Printf("\n%s", t[0][i])
+		for j := 1; j < len(t); j++ {
+			fmt.Printf(",%s", t[j][i])
+		}
+	}
+	fmt.Printf("\n\n================================================================\n\n")
 }
