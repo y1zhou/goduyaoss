@@ -17,8 +17,8 @@ func TestFetchProviders(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
 
-	doc := requestPage(ts.URL + "/html")
-	providers := fetchProviders(doc)
+	doc := RequestPage(ts.URL + "/html")
+	providers := FetchProviders(doc)
 	if len(providers) != 51 {
 		t.Errorf("Found %d out of 51 providers.", len(providers))
 	}
@@ -38,7 +38,7 @@ func TestFetchImage(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
 
-	img := fetchImage(sampleProvider.ImgURL)
+	img := FetchImage(sampleProvider.ImgURL)
 
 	width, height := img.Bounds().Max.X, img.Bounds().Max.Y
 	if width != 1359 {
