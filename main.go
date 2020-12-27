@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"runtime"
 	"sync"
@@ -10,69 +11,53 @@ import (
 )
 
 func main() {
-	netProvider := "ChinaMobile"
-	url := "https://www.duyaoss.com/archives/1031/"
-	log.Printf("Crawling %s\n", netProvider)
-	doc := crawler.RequestPage(url)
-	providers := crawler.FetchProviders(doc)
-	provTest := providers[5:10]
-
-	var wg sync.WaitGroup
+	var wgWorker sync.WaitGroup
+	var wgSaver sync.WaitGroup
 	// Each Tesseract process uses a maximum of 4 threads
 	// https://github.com/tesseract-ocr/tesseract/issues/1600
 	numWorkers := runtime.NumCPU() / 4
 	queue := make(chan ocr.Job, numWorkers)
-	res := make(chan [][]string, len(providers)*3)
+	res := make(chan ocr.Result, numWorkers*2)
 
 	for w := 0; w < numWorkers; w++ {
-		wg.Add(1)
-		go ocr.Worker(queue, res, &wg)
+		wgWorker.Add(1)
+		go ocr.Worker(queue, res, &wgWorker)
 	}
 
 	// Send jobs to the queue
 	go func() {
 		defer close(queue)
-		for _, provider := range provTest {
-			if provider.ImgURL != "" {
-				img := crawler.FetchImage(provider.ImgURL)
-				ocr.AddJob(queue, img, netProvider, provider.Name)
-			} else {
-				for _, subProvider := range provider.Subgroup {
-					img := crawler.FetchImage(subProvider.ImgURL)
-					ocr.AddJob(queue, img, netProvider, subProvider.Name)
+		for netProvider, url := range crawler.Pages {
+			log.Printf("Crawling %s\n", netProvider)
+			doc := crawler.RequestPage(url)
+			providers := crawler.FetchProviders(doc)
+			provTest := providers[5:10]
+
+			for _, provider := range provTest {
+				if provider.ImgURL != "" {
+					img := crawler.FetchImage(provider.ImgURL)
+					ocr.AddJob(queue, img, netProvider, provider.Name)
+				} else {
+					for _, subProvider := range provider.Subgroup {
+						img := crawler.FetchImage(subProvider.ImgURL)
+						ocr.AddJob(queue, img, netProvider, subProvider.Name)
+					}
 				}
 			}
 		}
 	}()
 
+	go func() {
+		wgSaver.Add(1)
+		defer wgSaver.Done()
+		for s := range res {
+			fmt.Printf("Net provider: %s\nService provider: %s\n\n", s.NetProvider, s.Provider)
+			ocr.PrintTable(s.Table)
+		}
+	}()
+
 	// Close the res channel after all workers finish
-	wg.Wait()
+	wgWorker.Wait()
 	close(res)
-
-	for s := range res {
-		ocr.PrintTable(s)
-	}
-
-	// for netProvider, url := range crawler.Pages {
-	// 	log.Printf("Crawling %s\n", netProvider)
-	// 	doc := crawler.RequestPage(url)
-	// 	providers := crawler.FetchProviders(doc)
-
-	// 	for _, provider := range providers {
-	// 		log.Printf("Getting information for: %q\n", provider.Name)
-	// 		if provider.ImgURL != "" {
-	// 			img := crawler.FetchImage(provider.ImgURL)
-	// 			imgMat := ocr.ImgToMat(img)
-
-	// 			client := gosseract.NewClient()
-	// 			defer client.Close()
-
-	// 			testVersion, testTime := ocr.GetMetadata(imgMat, client)
-	// 			log.Printf("%s\n%s\n", testVersion, testTime)
-
-	// 			providerInfo := ocr.ImgToTable(imgMat)
-	// 			log.Printf("%s has %d rows and %d columns\n", provider.Name, len(providerInfo), len(providerInfo[0]))
-	// 		}
-	// 	}
-	// }
+	wgSaver.Wait()
 }

@@ -14,6 +14,12 @@ type Job struct {
 	Image       gocv.Mat // image used for OCR
 }
 
+type Result struct {
+	NetProvider string
+	Provider    string
+	Table       [][]string
+}
+
 func AddJob(queue chan Job, img image.Image, netProvider string, provider string) {
 	imgMat := ImgToMat(img)
 
@@ -22,11 +28,15 @@ func AddJob(queue chan Job, img image.Image, netProvider string, provider string
 	}
 }
 
-func Worker(queue chan Job, res chan [][]string, wg *sync.WaitGroup) {
+func Worker(queue chan Job, res chan Result, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for job := range queue {
 		jobTable := ImgToTable(job.Image)
 
-		res <- jobTable
+		res <- Result{
+			NetProvider: job.NetProvider,
+			Provider:    job.Provider,
+			Table:       jobTable,
+		}
 	}
 }
