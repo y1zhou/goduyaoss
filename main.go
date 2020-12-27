@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"runtime"
 	"sync"
 
 	"github.com/y1zhou/goduyaoss/pkg/crawler"
@@ -17,7 +18,9 @@ func main() {
 	provTest := providers[5:10]
 
 	var wg sync.WaitGroup
-	const numWorkers int = 3 // TODO: this should be passed from the cli
+	// Each Tesseract process uses a maximum of 4 threads
+	// https://github.com/tesseract-ocr/tesseract/issues/1600
+	numWorkers := runtime.NumCPU() / 4
 	queue := make(chan ocr.Job, numWorkers)
 	res := make(chan [][]string, len(providers)*3)
 
