@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"log"
 	"regexp"
 	"strconv"
@@ -36,6 +37,14 @@ VALUES (
 	:net_provider, :provider, :timestamp, :provider_group, :remarks,
 	:loss, :ping, :google_ping, :avg_speed, :max_speed, :udp_nat_type
 );
+`
+
+var querySQL = `
+SELECT timestamp FROM duyaoss
+WHERE
+	net_provider =? AND provider =?
+ORDER BY
+	timestamp DESC LIMIT 1;
 `
 
 // Row is the struct for a row to be inserted in the database
@@ -95,11 +104,18 @@ func InsertRows(db *sqlx.DB, netProvider string, provider string, timestamp time
 	tx.Commit()
 }
 
-// func QueryDb(db *sqlx.DB, netProvider string, provider string) time.Time {
-// 	row := db.QueryRow("SELECT timestamp FROM duyaoss WHERE net_provider=? AND provider=?", netProvider, provider)
-// 	var timestamp time.Time
-// 	err = row.Scan(&timestamp)
-// }
+// QueryTime gets the latest timestamp for a specific provider
+func QueryTime(db *sqlx.DB, netProvider string, provider string) time.Time {
+	var p Row
+	err := db.QueryRowx(querySQL, netProvider, provider).StructScan(&p)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return time.Time{}
+		}
+		log.Fatalf("Error finding the timestamp for %q -> %q\n", netProvider, provider)
+	}
+	return p.Timestamp
+}
 
 func fixPercent(s string) float64 {
 	// remove the percent sign at the end

@@ -2,9 +2,12 @@ package ocr
 
 import (
 	"image"
+	"log"
 	"sync"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/y1zhou/goduyaoss/pkg/db"
 	"gocv.io/x/gocv"
 )
 
@@ -33,17 +36,23 @@ func AddJob(queue chan Job, img image.Image, netProvider string, provider string
 }
 
 // Worker performs OCR on the tables and add results to a channel.
-func Worker(queue chan Job, res chan Result, wg *sync.WaitGroup) {
+func Worker(DB *sqlx.DB, queue chan Job, res chan Result, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for job := range queue {
 		timestamp := GetMetadata(job.Image)
-		jobTable := ImgToTable(job.Image)
+		lastTime := db.QueryTime(DB, job.NetProvider, job.Provider)
+		if timestamp.After(lastTime) {
+			log.Printf("Running OCR on: %s -> %s\n", job.NetProvider, job.Provider)
+			jobTable := ImgToTable(job.Image)
 
-		res <- Result{
-			NetProvider: job.NetProvider,
-			Provider:    job.Provider,
-			Timestamp:   timestamp,
-			Table:       jobTable,
+			res <- Result{
+				NetProvider: job.NetProvider,
+				Provider:    job.Provider,
+				Timestamp:   timestamp,
+				Table:       jobTable,
+			}
+		} else {
+			log.Printf("%s -> %s is up to date\n", job.NetProvider, job.Provider)
 		}
 	}
 }

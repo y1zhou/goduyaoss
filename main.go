@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"runtime"
 	"sync"
 
@@ -11,6 +11,10 @@ import (
 )
 
 func main() {
+	dbName := "test.db"
+	log.Printf("Connecting to database: %s\n", dbName)
+	DB := db.ConnectDb(dbName)
+
 	var wgWorker sync.WaitGroup
 	var wgSaver sync.WaitGroup
 	// Each Tesseract process uses a maximum of 4 threads
@@ -19,20 +23,21 @@ func main() {
 	queue := make(chan ocr.Job, numWorkers)
 	res := make(chan ocr.Result, numWorkers*2)
 
+	log.Printf("Spawning %d workers\n", numWorkers)
 	for w := 0; w < numWorkers; w++ {
 		wgWorker.Add(1)
-		go ocr.Worker(queue, res, &wgWorker)
+		go ocr.Worker(DB, queue, res, &wgWorker)
 	}
 
 	// Send jobs to the queue
 	go func() {
 		defer close(queue)
 		for netProvider, url := range crawler.Pages {
+			log.Printf("Requesting page for %s: %s\n", netProvider, url)
 			doc := crawler.RequestPage(url)
 			providers := crawler.FetchProviders(doc)
-			provTest := providers[4:5]
 
-			for _, provider := range provTest {
+			for _, provider := range providers {
 				if provider.ImgURL != "" {
 					img := crawler.FetchImage(provider.ImgURL)
 					ocr.AddJob(queue, img, netProvider, provider.Name)
@@ -50,10 +55,7 @@ func main() {
 		wgSaver.Add(1)
 		defer wgSaver.Done()
 
-		DB := db.ConnectDb("test.db")
 		for s := range res {
-			fmt.Printf("Net provider: %s\nService provider: %s\n\n", s.NetProvider, s.Provider)
-			// ocr.PrintTable(s.Table)
 			db.InsertRows(DB, s.NetProvider, s.Provider, s.Timestamp, s.Table)
 		}
 	}()
