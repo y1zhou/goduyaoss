@@ -61,8 +61,8 @@ type Row struct {
 	UDPNATType  string    `db:"udp_nat_type"`
 }
 
-// ConnectDb connects to a database, verifies with a ping, and creates the table.
-func ConnectDb(dbFilename string) *sqlx.DB {
+// connectDb connects to a database, verifies with a ping, and creates the table.
+func connectDb(dbFilename string) *sqlx.DB {
 	db, err := sqlx.Connect("sqlite3", dbFilename)
 	if err != nil {
 		log.Fatalln(err)
@@ -73,10 +73,12 @@ func ConnectDb(dbFilename string) *sqlx.DB {
 }
 
 // InsertRows adds rows to db in the correct format
-func InsertRows(db *sqlx.DB, netProvider string, provider string, timestamp time.Time, tbl [][]string) {
+func InsertRows(dbName string, netProvider string, provider string, timestamp time.Time, tbl [][]string) {
+	DB := connectDb(dbName)
+	defer DB.Close()
 	numRows, numCols := len(tbl[0]), len(tbl)
 
-	tx := db.MustBegin()
+	tx := DB.MustBegin()
 	for i := 0; i < numRows; i++ {
 		rowData := Row{
 			NetProvider: netProvider,
@@ -104,9 +106,11 @@ func InsertRows(db *sqlx.DB, netProvider string, provider string, timestamp time
 }
 
 // QueryTime gets the latest timestamp for a specific provider
-func QueryTime(db *sqlx.DB, netProvider string, provider string) time.Time {
+func QueryTime(dbName string, netProvider string, provider string) time.Time {
+	DB := connectDb(dbName)
+	defer DB.Close()
 	var p Row
-	err := db.QueryRowx(querySQL, netProvider, provider).StructScan(&p)
+	err := DB.QueryRowx(querySQL, netProvider, provider).StructScan(&p)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return time.Time{}
