@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"log"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -119,8 +118,7 @@ func QueryTime(db *sqlx.DB, netProvider string, provider string) time.Time {
 
 func fixPercent(s string) float64 {
 	// remove the percent sign at the end
-	rgx := regexp.MustCompile(`%$`)
-	res := rgx.ReplaceAllString(s, "")
+	res := strings.ReplaceAll(s, "%", "")
 	sNum, err := strconv.ParseFloat(res, 64)
 	if err != nil {
 		log.Fatal(err)
@@ -134,15 +132,10 @@ func fixNumber(s string) float64 {
 	if len(s) < 3 {
 		return 0
 	}
-	correctRgx := regexp.MustCompile(`\.\d\d$`)
-	var res string
-	if !correctRgx.MatchString(s) {
-		res = strings.ReplaceAll(s, ".", "")
-		idx := len(res) - 2
-		res = res[:idx] + "." + res[idx:]
-	} else {
-		res = s
-	}
+
+	res := strings.ReplaceAll(s, ".", "")
+	idx := len(res) - 2
+	res = res[:idx] + "." + res[idx:]
 
 	sNum, err := strconv.ParseFloat(res, 64)
 	if err != nil {
