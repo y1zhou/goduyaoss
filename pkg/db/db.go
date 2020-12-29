@@ -64,6 +64,7 @@ func ConnectDb(dbFilename string) *sqlx.DB {
 	return db
 }
 
+// InsertRows adds rows to db in the correct format
 func InsertRows(db *sqlx.DB, netProvider string, provider string, timestamp time.Time, tbl [][]string) {
 	numRows, numCols := len(tbl[0]), len(tbl)
 

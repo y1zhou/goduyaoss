@@ -61,6 +61,7 @@ func cleanTimestamp(s *string) time.Time {
 	return res
 }
 
+// PrintTable outputs the result table in a nice foramt.
 func PrintTable(t [][]string) {
 	headers := GetHeader(len(t))
 	fmt.Printf("%s", headers[0])
