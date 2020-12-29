@@ -67,29 +67,25 @@ func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool
 // GetMetadata retrieves information from the image that only need to be run once:
 // The SSRSpeed software version at the very top, and
 // the time the image was generated (timestamp in the last row).
-func GetMetadata(img gocv.Mat, client *gosseract.Client) (string, time.Time) {
+func GetMetadata(img gocv.Mat) time.Time {
 	// Convert to grayscale
 	imgGray := img.Clone()
 	defer imgGray.Close()
 	convertToGrayscale(imgGray)
-
-	// SSRSpeed version
-	imgVersion := cropImage(imgGray, 0, imgGray.Cols(), 0, rowHeight)
-	defer imgVersion.Close()
-	configTesseract(client, "", true, false)
-	resVersion := imgOCR(imgVersion, client)
-	cleanVersion(&resVersion)
 
 	// last row is the timestamp
 	imgTimestamp := cropImage(imgGray,
 		0, imgGray.Cols()/2,
 		imgGray.Rows()-rowHeight, imgGray.Rows())
 	defer imgTimestamp.Close()
+
+	client := gosseract.NewClient()
+	defer client.Close()
 	configTesseract(client, "", true, false)
 	resTimestr := imgOCR(imgTimestamp, client)
 	resTimestamp := cleanTimestamp(&resTimestr)
 
-	return resVersion, resTimestamp
+	return resTimestamp
 }
 
 // GetHeader returns the column names based on the number of columns.

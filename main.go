@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"runtime"
 	"sync"
 
 	"github.com/y1zhou/goduyaoss/pkg/crawler"
+	"github.com/y1zhou/goduyaoss/pkg/db"
 	"github.com/y1zhou/goduyaoss/pkg/ocr"
 )
 
@@ -28,10 +28,9 @@ func main() {
 	go func() {
 		defer close(queue)
 		for netProvider, url := range crawler.Pages {
-			log.Printf("Crawling %s\n", netProvider)
 			doc := crawler.RequestPage(url)
 			providers := crawler.FetchProviders(doc)
-			provTest := providers[5:10]
+			provTest := providers[4:5]
 
 			for _, provider := range provTest {
 				if provider.ImgURL != "" {
@@ -50,9 +49,12 @@ func main() {
 	go func() {
 		wgSaver.Add(1)
 		defer wgSaver.Done()
+
+		DB := db.ConnectDb("test.db")
 		for s := range res {
 			fmt.Printf("Net provider: %s\nService provider: %s\n\n", s.NetProvider, s.Provider)
-			ocr.PrintTable(s.Table)
+			// ocr.PrintTable(s.Table)
+			db.InsertRows(DB, s.NetProvider, s.Provider, s.Timestamp, s.Table)
 		}
 	}()
 

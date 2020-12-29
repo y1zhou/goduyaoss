@@ -78,14 +78,9 @@ func TestFileOCR(t *testing.T) {
 func TestGetMetadata(t *testing.T) {
 	img := readImg("testdata/sample_img.png")
 	defer img.Close()
-	client := gosseract.NewClient()
-	defer client.Close()
 
-	version, timestamp := GetMetadata(img, client)
+	timestamp := GetMetadata(img)
 
-	if version != "2.7.2" {
-		t.Errorf("Version detected is %q", version)
-	}
 	ans, _ := time.Parse("2006-01-02T15:04:05", "2020-12-11T20:30:03")
 	if timestamp != ans {
 		t.Errorf("Timestamp detected is %q", timestamp)

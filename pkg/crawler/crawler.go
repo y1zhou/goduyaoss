@@ -12,9 +12,9 @@ import (
 
 // Pages - the pages to crawl.
 var Pages = map[string]string{
-	"ChinaMobile":  "https://www.duyaoss.com/archives/1031/",
-	"ChinaUnicom":  "https://www.duyaoss.com/archives/3/",
-	"ChinaTelecom": "https://www.duyaoss.com/archives/1/",
+	"移动": "https://www.duyaoss.com/archives/1031/",
+	"联通": "https://www.duyaoss.com/archives/3/",
+	"电信": "https://www.duyaoss.com/archives/1/",
 }
 
 // Provider holds the information about a provider. It's possible for a provider
@@ -53,6 +53,7 @@ func FetchProviders(doc *goquery.Document) []Provider {
 		// Each provider's name starts with a serial number.
 		title := s.Text()
 		if regexProvider.MatchString(title) {
+			title = regexProvider.ReplaceAllString(title, "")
 			res := Provider{Name: title}
 
 			// See if there's subgroups. Check for <h3> elements until the next provider
