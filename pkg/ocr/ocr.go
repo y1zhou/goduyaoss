@@ -38,15 +38,15 @@ func imgOCR(imgMat gocv.Mat, client *gosseract.Client) string {
 	// Mat -> image.Image
 	imgByte, err := gocv.IMEncode(gocv.PNGFileExt, imgMat)
 	if err != nil {
-		log.Fatalf("Can't convert gocv.Mat to []byte: %q", err)
+		log.Fatalf("Can't convert gocv.Mat to []byte: %q", err.Error())
 	}
 
 	if err := client.SetImageFromBytes(imgByte); err != nil {
-		log.Fatalf("Can't send image bytes to Tesseract: %q", err)
+		log.Fatalf("Can't send image bytes to Tesseract: %q", err.Error())
 	}
 	text, err := client.Text()
 	if err != nil {
-		log.Fatalf("Can't get text from image: %q", err)
+		log.Fatalf("Can't get text from image: %q", err.Error())
 	}
 
 	return text
@@ -114,15 +114,15 @@ func GetHeader(numCols int) []string {
 // ImgToTable runs Tesseract on each cell and returns a parsed table.
 func ImgToTable(img gocv.Mat) [][]string {
 	rows, cols := getBorderIndex(img)
+	numRows, numCols := len(rows)-1, len(cols)-1
 
 	// Remove watermark and background colors
-	removeColor(&img, cols)
+	// removeColor(&img, cols)
 
 	// Enhance row borders
 	drawRowBorders(&img, rows)
 
 	// Header names
-	numRows, numCols := len(rows)-1, len(cols)-1
 	header := GetHeader(numCols)
 
 	// Group name stays the same for all rows

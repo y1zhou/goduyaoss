@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -133,9 +134,9 @@ func fixPercent(s string) float64 {
 
 // all numbers present in the table should have precision 2
 func fixNumber(s string) float64 {
-	res := strings.TrimSpace(s)
-	res = strings.ReplaceAll(res, ".", "")
-	if len(res) < 3 || s == "NA" {
+	rgx := regexp.MustCompile(`[^\d]`)
+	res := rgx.ReplaceAllString(s, "")
+	if len(res) < 3 {
 		return 0
 	}
 

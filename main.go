@@ -44,7 +44,6 @@ func main() {
 		}
 		close(queue)
 	}()
-	wgCrawler.Wait()
 
 	// Each Tesseract process uses a maximum of 4 threads
 	// https://github.com/tesseract-ocr/tesseract/issues/1600
@@ -57,6 +56,8 @@ func main() {
 		go ocr.Worker(w+1, dbName, queue, &wgWorker)
 	}
 
+	wgCrawler.Wait()
+	log.Printf("Crawler finished!")
 	wgWorker.Wait()
 	log.Printf("All jobs finished!")
 }
