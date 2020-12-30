@@ -59,7 +59,7 @@ func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool
 		client.SetLanguage("chi_sim", "eng")
 	}
 	if colMode {
-		client.SetPageSegMode(gosseract.PSM_SINGLE_BLOCK)
+		client.SetPageSegMode(gosseract.PSM_AUTO)
 	} else {
 		client.SetPageSegMode(gosseract.PSM_SINGLE_LINE)
 	}
@@ -163,12 +163,13 @@ func ImgToTable(img gocv.Mat) [][]string {
 		// This is much slower but also more accurate.
 		if len(txtCol) != numRows-4 {
 			txtCol = make([]string, numRows-4)
-			if j == 1 {
-				configTesseract(client, header[j], false, false)
-			} else {
-				configTesseract(client, header[j], true, false)
-			}
+
 			for i := 2; i < numRows-2; i++ {
+				if j == 1 {
+					configTesseract(client, header[j], false, false)
+				} else {
+					configTesseract(client, header[j], true, false)
+				}
 				cell := cropImage(img, cols[j], cols[j+1], rows[i], rows[i+1])
 				defer cell.Close()
 
