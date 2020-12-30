@@ -31,7 +31,10 @@ func readImg(imgPath string) gocv.Mat {
 
 func imgToBytes(img image.Image) []byte {
 	buf := new(bytes.Buffer)
-	png.Encode(buf, img)
+	err := png.Encode(buf, img)
+	if err != nil {
+		log.Fatalf("Error encoding image to bytes: %q", err)
+	}
 	return buf.Bytes()
 }
 
@@ -43,11 +46,6 @@ func ImgToMat(img image.Image) gocv.Mat {
 		log.Fatal(err)
 	}
 	return imgMat
-}
-
-func cleanVersion(s *string) {
-	regexVersion := regexp.MustCompile(`^.*v\s*(\d+\.\d+\.\d+).*$`)
-	*s = regexVersion.ReplaceAllString(*s, `$1`)
 }
 
 func cleanTimestamp(s *string) time.Time {

@@ -42,9 +42,12 @@ func imgOCR(imgMat gocv.Mat, client *gosseract.Client) string {
 	}
 
 	if err := client.SetImageFromBytes(imgByte); err != nil {
-		log.Fatal(err)
+		log.Fatalf("Can't send image bytes to Tesseract: %q", err)
 	}
-	text, _ := client.Text()
+	text, err := client.Text()
+	if err != nil {
+		log.Fatalf("Can't get text from image: %q", err)
+	}
 
 	return text
 }
@@ -57,8 +60,9 @@ func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool
 	}
 	if colMode {
 		client.SetPageSegMode(gosseract.PSM_SINGLE_BLOCK)
+	} else {
+		client.SetPageSegMode(gosseract.PSM_SINGLE_LINE)
 	}
-	client.SetPageSegMode(gosseract.PSM_SINGLE_LINE)
 
 	whitelist, _ := charWhitelist[whitelistKey]
 	client.SetWhitelist(whitelist) // sets whitelist to "" if key not in map

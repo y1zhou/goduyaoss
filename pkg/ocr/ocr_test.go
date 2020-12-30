@@ -7,14 +7,6 @@ import (
 	"github.com/otiai10/gosseract"
 )
 
-func TestCleanVersion(t *testing.T) {
-	s := "SSRSpeed Result Table (v2.7.2)"
-	cleanVersion(&s)
-	if s != "2.7.2" {
-		t.Fatalf("Found SSRSpeed version %q, should be v2.7.2\n", s)
-	}
-}
-
 func TestCleanTimestamp(t *testing.T) {
 	s := "Generated at 2020-12-11 20:30:03"
 	ans, _ := time.Parse("2006-01-02T15:04:05", "2020-12-11T20:30:03")

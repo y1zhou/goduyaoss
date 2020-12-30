@@ -42,13 +42,13 @@ func Worker(id int, dbName string, queue chan Job, wg *sync.WaitGroup) {
 		timestamp := GetMetadata(job.Image)
 		lastTime := db.QueryTime(dbName, job.NetProvider, job.Provider)
 		if timestamp.After(lastTime) {
-			log.Printf("Worker %d running OCR on: %s -> %s\n", id, job.NetProvider, job.Provider)
+			log.Printf("[Worker %d] Running OCR on: %s -> %s\n", id, job.NetProvider, job.Provider)
 			jobTable := ImgToTable(job.Image)
 
 			db.InsertRows(dbName, job.NetProvider, job.Provider, timestamp, jobTable)
-			log.Printf("Worker %d results saved: %s -> %s\n", id, job.NetProvider, job.Provider)
+			log.Printf("[Worker %d] Results saved: %s -> %s\n", id, job.NetProvider, job.Provider)
 		} else {
-			log.Printf("%s -> %s is up to date\n", job.NetProvider, job.Provider)
+			log.Printf("[Worker %d] %s -> %s is up to date\n", id, job.NetProvider, job.Provider)
 		}
 	}
 }
