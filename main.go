@@ -12,37 +12,48 @@ import (
 func main() {
 	dbName := "test.db"
 
-	queue := make(chan ocr.Job)
+	queue := make(chan ocr.Job, 1000)
 
 	// Send jobs to the queue
+	var wgCrawler sync.WaitGroup
+	wgCrawler.Add(1)
 	go func() {
-		defer close(queue)
+		defer wgCrawler.Done()
 		for netProvider, url := range crawler.Pages {
 			doc := crawler.RequestPage(url)
 			providers := crawler.FetchProviders(doc)
-			provTest := providers[4:6]
+			provTest := providers[4:10]
 
 			for _, provider := range provTest {
 				if provider.ImgURL != "" {
 					img := crawler.FetchImage(provider.ImgURL)
 					ocr.AddJob(queue, img, netProvider, provider.Name)
+
+					log.Printf("[main] %s -> %s added to queue\n",
+						netProvider, provider.Name)
 				} else {
 					for _, subProvider := range provider.Subgroup {
 						img := crawler.FetchImage(subProvider.ImgURL)
 						ocr.AddJob(queue, img, netProvider, subProvider.Name)
+
+						log.Printf("[main] %s -> %s added to queue\n",
+							netProvider, subProvider.Name)
 					}
 				}
 			}
 		}
+		close(queue)
 	}()
+	wgCrawler.Wait()
 
 	// Each Tesseract process uses a maximum of 4 threads
 	// https://github.com/tesseract-ocr/tesseract/issues/1600
 	numWorkers := runtime.NumCPU() / 4
 	log.Printf("Spawning %d workers\n", numWorkers)
+
 	var wgWorker sync.WaitGroup
-	wgWorker.Add(numWorkers)
 	for w := 0; w < numWorkers; w++ {
+		wgWorker.Add(1)
 		go ocr.Worker(w+1, dbName, queue, &wgWorker)
 	}
 

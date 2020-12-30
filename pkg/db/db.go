@@ -100,7 +100,11 @@ func InsertRows(dbName string, netProvider string, provider string, timestamp ti
 			rowData.UDPNATType = tbl[7][i]
 		}
 
-		tx.NamedExec(insertSQL, &rowData)
+		_, err := tx.NamedExec(insertSQL, &rowData)
+		if err != nil {
+			log.Fatalf("Error in transaction for %s -> %s, row %d\n",
+				netProvider, provider, i)
+		}
 	}
 	tx.Commit()
 }
@@ -123,27 +127,24 @@ func QueryTime(dbName string, netProvider string, provider string) time.Time {
 func fixPercent(s string) float64 {
 	// remove the percent sign at the end
 	res := strings.ReplaceAll(s, "%", "")
-	sNum, err := strconv.ParseFloat(res, 64)
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	return sNum
+	return fixNumber(res)
 }
 
 // all numbers present in the table should have precision 2
 func fixNumber(s string) float64 {
-	if len(s) < 3 {
+	res := strings.TrimSpace(s)
+	res = strings.ReplaceAll(res, ".", "")
+	if len(res) < 3 || s == "NA" {
 		return 0
 	}
 
-	res := strings.ReplaceAll(s, ".", "")
 	idx := len(res) - 2
 	res = res[:idx] + "." + res[idx:]
 
 	sNum, err := strconv.ParseFloat(res, 64)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error parsing %q -> %q: %s", s, res, err.Error())
 	}
 
 	return sNum
@@ -151,7 +152,7 @@ func fixNumber(s string) float64 {
 
 // AvgSpeed and MaxSpeed have units at the end (KB, MB or GB)
 func fixSpeed(s string) float64 {
-	if len(s) < 3 || s == "NA" {
+	if len(s) < 3 {
 		return 0
 	}
 	idx := len(s) - 2
