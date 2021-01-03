@@ -38,13 +38,16 @@ func imgOCR(imgMat gocv.Mat, client *gosseract.Client) string {
 	// Mat -> image.Image
 	imgByte, err := gocv.IMEncode(gocv.PNGFileExt, imgMat)
 	if err != nil {
-		log.Fatalf("Can't convert gocv.Mat to []byte: %q", err)
+		log.Fatalf("Can't convert gocv.Mat to []byte: %q", err.Error())
 	}
 
 	if err := client.SetImageFromBytes(imgByte); err != nil {
-		log.Fatal(err)
+		log.Fatalf("Can't send image bytes to Tesseract: %q", err.Error())
 	}
-	text, _ := client.Text()
+	text, err := client.Text()
+	if err != nil {
+		log.Fatalf("Can't get text from image: %q", err.Error())
+	}
 
 	return text
 }
@@ -56,9 +59,10 @@ func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool
 		client.SetLanguage("chi_sim", "eng")
 	}
 	if colMode {
-		client.SetPageSegMode(gosseract.PSM_SINGLE_BLOCK)
+		client.SetPageSegMode(gosseract.PSM_AUTO)
+	} else {
+		client.SetPageSegMode(gosseract.PSM_SINGLE_LINE)
 	}
-	client.SetPageSegMode(gosseract.PSM_SINGLE_LINE)
 
 	whitelist, _ := charWhitelist[whitelistKey]
 	client.SetWhitelist(whitelist) // sets whitelist to "" if key not in map
@@ -67,29 +71,25 @@ func configTesseract(client *gosseract.Client, whitelistKey string, engOnly bool
 // GetMetadata retrieves information from the image that only need to be run once:
 // The SSRSpeed software version at the very top, and
 // the time the image was generated (timestamp in the last row).
-func GetMetadata(img gocv.Mat, client *gosseract.Client) (string, time.Time) {
+func GetMetadata(img gocv.Mat) time.Time {
 	// Convert to grayscale
 	imgGray := img.Clone()
 	defer imgGray.Close()
 	convertToGrayscale(imgGray)
-
-	// SSRSpeed version
-	imgVersion := cropImage(imgGray, 0, imgGray.Cols(), 0, rowHeight)
-	defer imgVersion.Close()
-	configTesseract(client, "", true, false)
-	resVersion := imgOCR(imgVersion, client)
-	cleanVersion(&resVersion)
 
 	// last row is the timestamp
 	imgTimestamp := cropImage(imgGray,
 		0, imgGray.Cols()/2,
 		imgGray.Rows()-rowHeight, imgGray.Rows())
 	defer imgTimestamp.Close()
+
+	client := gosseract.NewClient()
+	defer client.Close()
 	configTesseract(client, "", true, false)
 	resTimestr := imgOCR(imgTimestamp, client)
 	resTimestamp := cleanTimestamp(&resTimestr)
 
-	return resVersion, resTimestamp
+	return resTimestamp
 }
 
 // GetHeader returns the column names based on the number of columns.
@@ -114,15 +114,15 @@ func GetHeader(numCols int) []string {
 // ImgToTable runs Tesseract on each cell and returns a parsed table.
 func ImgToTable(img gocv.Mat) [][]string {
 	rows, cols := getBorderIndex(img)
+	numRows, numCols := len(rows)-1, len(cols)-1
 
 	// Remove watermark and background colors
-	removeColor(&img, cols)
+	// removeColor(&img, cols)
 
 	// Enhance row borders
 	drawRowBorders(&img, rows)
 
 	// Header names
-	numRows, numCols := len(rows)-1, len(cols)-1
 	header := GetHeader(numCols)
 
 	// Group name stays the same for all rows
@@ -163,12 +163,13 @@ func ImgToTable(img gocv.Mat) [][]string {
 		// This is much slower but also more accurate.
 		if len(txtCol) != numRows-4 {
 			txtCol = make([]string, numRows-4)
-			if j == 1 {
-				configTesseract(client, header[j], false, false)
-			} else {
-				configTesseract(client, header[j], true, false)
-			}
+
 			for i := 2; i < numRows-2; i++ {
+				if j == 1 {
+					configTesseract(client, header[j], false, false)
+				} else {
+					configTesseract(client, header[j], true, false)
+				}
 				cell := cropImage(img, cols[j], cols[j+1], rows[i], rows[i+1])
 				defer cell.Close()
 

@@ -31,7 +31,10 @@ func readImg(imgPath string) gocv.Mat {
 
 func imgToBytes(img image.Image) []byte {
 	buf := new(bytes.Buffer)
-	png.Encode(buf, img)
+	err := png.Encode(buf, img)
+	if err != nil {
+		log.Fatalf("Error encoding image to bytes: %q", err)
+	}
 	return buf.Bytes()
 }
 
@@ -45,11 +48,6 @@ func ImgToMat(img image.Image) gocv.Mat {
 	return imgMat
 }
 
-func cleanVersion(s *string) {
-	regexVersion := regexp.MustCompile(`^.*v\s*(\d+\.\d+\.\d+).*$`)
-	*s = regexVersion.ReplaceAllString(*s, `$1`)
-}
-
 func cleanTimestamp(s *string) time.Time {
 	regexTime := regexp.MustCompile(`^.*?(\d+-\d+-\d+)\s+(\d+:\d+:\d+).*$`)
 	sNew := regexTime.ReplaceAllString(*s, `${1}T$2`)
@@ -61,6 +59,7 @@ func cleanTimestamp(s *string) time.Time {
 	return res
 }
 
+// PrintTable outputs the result table in a nice foramt.
 func PrintTable(t [][]string) {
 	headers := GetHeader(len(t))
 	fmt.Printf("%s", headers[0])
