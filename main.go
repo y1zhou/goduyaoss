@@ -12,7 +12,7 @@ import (
 func main() {
 	dbName := "test.db"
 
-	queue := make(chan ocr.Job, 1000)
+	queue := make(chan ocr.Job, 5)
 
 	// Send jobs to the queue
 	var wgCrawler sync.WaitGroup
@@ -22,9 +22,8 @@ func main() {
 		for netProvider, url := range crawler.Pages {
 			doc := crawler.RequestPage(url)
 			providers := crawler.FetchProviders(doc)
-			provTest := providers[4:10]
 
-			for _, provider := range provTest {
+			for _, provider := range providers {
 				if provider.ImgURL != "" {
 					img := crawler.FetchImage(provider.ImgURL)
 					ocr.AddJob(queue, img, netProvider, provider.Name)
