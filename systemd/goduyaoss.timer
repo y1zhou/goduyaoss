@@ -1,0 +1,18 @@
+[Unit]
+Description=Run goduyaoss everyday at 3AM
+
+# Allow manual starts and stops
+RefuseManualStart=no
+RefuseManualStop=no
+
+[Timer]
+# Execute job if it missed a run due to machine being off
+Persistent=true
+# File describing job to execute
+Unit=goduyaoss.service
+OnCalendar=*-*-* 03:00:00
+RandomizedDelaySec=15m
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

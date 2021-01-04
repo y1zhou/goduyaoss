@@ -1,0 +1,25 @@
+[Unit]
+Description=Retrieve data from DuyaoSS and run OCR on updated images
+Documentation=https://github.com/y1zhou/goduyaoss
+Wants=network-online.target goduyaoss.timer
+After=network-online.target
+
+[Service]
+Type=simple
+
+####################################################
+# Modify the following lines
+WorkingDirectory=/home/pi/pkg/data/goduyaoss
+ExecStart=/home/pi/dev/goduyaoss/goduyaoss
+
+StandardOutput=append:/home/pi/pkg/data/goduyaoss/output.log
+StandardError=append:/home/pi/pkg/data/goduyaoss/error.log
+####################################################
+
+# restart the process if it exits prematurely
+Restart=on-failure
+StartLimitBurst=3
+StartLimitInterval=300s
+
+[Install]
+WantedBy=multi-user.target
